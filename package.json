@@ -1,0 +1,13 @@
+{
+  "name": "road-limit",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test:unit": "node --test test/*.test.js",
+    "test:e2e": "playwright test",
+    "test": "npm run test:unit && npm run test:e2e"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.0"
+  }
+}
