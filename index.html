@@ -417,7 +417,7 @@
     function updateCarPosition(lon, lat) {
       if (!map || !carMarker) return;
       carMarker.setLngLat([lon, lat]);
-      map.easeTo({ center: [lon, lat], duration: 300 });
+      map.easeTo({ center: [lon, lat], bearing: S.lastHeading, duration: 300 });
     }
 
     function updateBadges(segments, currentSpeedKmh) {
