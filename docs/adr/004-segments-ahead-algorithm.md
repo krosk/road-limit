@@ -23,40 +23,84 @@ consecutive road nodes around the turn (Heron's formula). `a` defaults to
 At a junction, multiple roads branch ahead. Naively picking "the next turn"
 would fire false warnings for branches the driver won't take.
 
-### First approach (rejected)
+### Approach 1 (rejected): forward half-plane scan
 
 Show a badge on every road feature within 500m in the forward half-plane.
 Problem: fired badges on roads 300m to the side that happened to be in the
 forward hemisphere but were clearly not on the driver's path.
 
+### Approach 2 (superseded): one-level junction detection
+
+Match the current road, walk it forward, then scan all other features for
+nodes within 25m of the walked path. One level deep: junctions off junctions
+were invisible.
+
 ## Decision
 
-**Map badges for all branches; bottom alert only on single-road stretches.**
+**BFS over the connected road graph; badges for all reachable branches;
+bottom alert only on single-road stretches.**
 
-The `segmentsAhead` algorithm (`lib/road.js`):
+### `segmentsAhead` algorithm (`lib/road.js`)
 
-1. **Match** the current road using `matchRoad` (nearest road segment within 50m).
-2. **Walk** the matched road forward up to `CFG.lookahead` (500m), collecting nodes.
-3. **Branch**: for every other visible road feature, find its closest node to
-   any point on the walked path. If within 25m (junction threshold), add it
-   as a branch segment, walking away from the junction up to the remaining distance.
+Signature:
+```js
+segmentsAhead(features, lon, lat, heading, maxDist, maxRadius, lookBehind, matchMaxDist)
+```
 
-The bottom alert (`#turn-warning`) fires only when `isSingleRoadAhead` is true
-— i.e., no junction branches were found. At junctions, the map badges carry
-the information instead.
+1. **Match** the current road with `matchRoad` (nearest road segment).
+   Abort if `dist > matchMaxDist` (`CFG.roadMatchMaxDist`, default 100 m).
 
-### Speed limit gaps
+2. **Look behind**: walk `lookBehind` metres backward along the matched road
+   (same starting node as the forward walk so the overlays share an endpoint).
+   Used to render the grey overlay behind the car for context.
 
-OSM `maxspeed` tags are absent on many minor roads. When missing, the badge
-shows the cornering-speed estimate from geometry (`corneringSpeed(radius, aThreshold)`).
-When no turn is detected either, no badge is shown for that segment.
+3. **BFS forward**: starting from the matched road, explore the road graph:
+   - Dequeue `{feature, startIdx, forward, distFromCar}`.
+   - Walk from `startIdx` in `forward` direction up to remaining distance
+     (`maxDist − distFromCar`). Add the resulting segment to results.
+   - For every other unvisited feature, find its node closest to any point
+     in the just-walked segment (junction threshold: 25 m).
+   - If within threshold and within budget: mark visited, enqueue **both**
+     directions from the junction node (driver may turn either way), carrying
+     the cumulative distance to the junction as `distFromCar`.
+   - Stop when queue is empty or all remaining distances ≤ 0.
+
+Key properties:
+- Features are visited at most once (visited Set keyed by feature object).
+- Both directions are explored at each junction, so dead-end roads and
+  bidirectional streets are all covered.
+- The cumulative distance budget is charged at the junction point, not the
+  start of the branch, so 500 m is spent as road distance from the car.
+
+### Road feature normalisation (`getRoadFeatures`)
+
+`queryRenderedFeatures` returns `MultiLineString` for roads that cross tile
+boundaries. These are expanded into individual `LineString` features before
+being passed to any lib function, so `matchRoad` and `segmentsAhead` only
+see `LineString` geometries.
+
+### Display
+
+The bottom alert (`#turn-warning`) fires only when `isSingleRoadAhead` is
+true — i.e., exactly one segment is ahead (no BFS branches found). At
+junctions the map badges carry the information instead.
+
+### `roadLayers` construction
+
+On map load, `roadLayers` is built from all `line`-type style layers whose
+`source-layer` is not in a known non-road set (waterway, water, boundary,
+landcover, landuse, contour). This catches roads in any source-layer name
+the tile schema uses (OpenFreeMap uses `transportation`).
 
 ## Consequences
 
-- Badges appear only on roads actually connected to the driver's current road.
-- At junctions the driver sees what each branch allows, without a forced prediction.
-- The 25m junction threshold works for normal road intersections; very wide
-  roads or complex interchanges may miss branches. Tunable if needed.
-- Tile boundary clipping can split one road into two features. The proximity
-  check handles this transparently (the split feature's start node is within
-  25m of the main road's last node).
+- All roads reachable from the car's current position within 500 m are
+  overlaid, regardless of how many junction hops away they are.
+- At junctions the driver sees what each branch allows; no forced prediction.
+- The 25 m junction threshold works for normal intersections; very wide roads
+  or complex interchanges may miss branches. Tunable if needed.
+- BFS complexity is O(features² × nodes) per render frame. Acceptable for
+  the ~50–200 features typical in a 500 m viewport at zoom 16.
+- `queryRenderedFeatures` returns 0 features during active tile loading (e.g.
+  after a large pan). A `map.on('idle')` handler re-triggers `renderDashboard`
+  once tiles settle.
