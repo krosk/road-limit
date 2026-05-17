@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Road Limit</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #111;
+      color: #fff;
+      font-family: system-ui, -apple-system, sans-serif;
+      height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      padding: 12px;
+      gap: 10px;
+      overflow: hidden;
+    }
+
+    .row { display: flex; gap: 10px; }
+    .flex1 { flex: 1; }
+
+    .card {
+      background: #1e1e1e;
+      border-radius: 14px;
+      padding: 12px 16px;
+    }
+
+    .label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #666;
+      margin-bottom: 4px;
+    }
+
+    /* Speed */
+    #speed-value {
+      font-size: 80px;
+      font-weight: 700;
+      line-height: 1;
+      font-variant-numeric: tabular-nums;
+    }
+    #speed-unit { font-size: 18px; color: #666; margin-left: 2px; }
+
+    /* Speed limit */
+    #limit-card { min-width: 90px; text-align: center; }
+    #speed-limit-value {
+      font-size: 52px;
+      font-weight: 700;
+      line-height: 1;
+      color: #f90;
+    }
+
+    /* G meters */
+    .g-row { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
+    .g-label { font-size: 11px; color: #666; width: 60px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .g-val { font-size: 13px; font-variant-numeric: tabular-nums; width: 44px; text-align: right; }
+    .g-bar-track {
+      flex: 1;
+      height: 10px;
+      background: #2a2a2a;
+      border-radius: 5px;
+      overflow: hidden;
+    }
+    .g-bar {
+      height: 100%;
+      border-radius: 5px;
+      width: 0%;
+      transition: width 0.08s linear, background 0.2s;
+      background: #3a9;
+    }
+    .g-bar.warn { background: #f90; }
+    .g-bar.over { background: #e33; }
+
+    /* Turn warning */
+    #turn-card {
+      display: none;
+      border-radius: 14px;
+      padding: 14px 16px;
+      background: #3a2000;
+      border: 1px solid #f90;
+      text-align: center;
+    }
+    #turn-card.visible { display: block; }
+    #turn-card.urgent { background: #3a0000; border-color: #e33; }
+
+    #turn-distance { font-size: 13px; color: #f90; margin-bottom: 2px; }
+    #turn-card.urgent #turn-distance { color: #e33; }
+    #turn-label { font-size: 12px; color: #888; margin-bottom: 4px; }
+    #turn-speed { font-size: 42px; font-weight: 700; line-height: 1; }
+
+    /* Status bar */
+    #status-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 6px 4px 0;
+    }
+    #road-name { font-size: 13px; color: #aaa; }
+    #status-msg { font-size: 11px; color: #444; text-align: right; }
+
+    /* Start screen */
+    #start-screen {
+      position: fixed;
+      inset: 0;
+      background: #111;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 20px;
+      z-index: 10;
+    }
+    #start-screen h1 { font-size: 28px; font-weight: 700; }
+    #start-screen p { font-size: 14px; color: #888; text-align: center; max-width: 280px; }
+    #start-btn {
+      background: #f90;
+      color: #000;
+      border: none;
+      border-radius: 50px;
+      padding: 14px 40px;
+      font-size: 18px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    #start-btn:active { opacity: 0.8; }
+  </style>
+</head>
+<body>
+
+  <!-- Start screen (needed for iOS motion permission) -->
+  <div id="start-screen">
+    <h1>Road Limit</h1>
+    <p>Live speed, G-force, and turn warnings for your drive.</p>
+    <button id="start-btn">Start</button>
+  </div>
+
+  <!-- Speed row -->
+  <div class="row">
+    <div class="card flex1">
+      <div class="label">Speed</div>
+      <div>
+        <span id="speed-value">0</span><span id="speed-unit">km/h</span>
+      </div>
+    </div>
+    <div class="card" id="limit-card">
+      <div class="label">Limit</div>
+      <div id="speed-limit-value">--</div>
+    </div>
+  </div>
+
+  <!-- G meters -->
+  <div class="card">
+    <div class="g-row">
+      <span class="g-label">Lateral</span>
+      <div class="g-bar-track"><div class="g-bar" id="lat-bar"></div></div>
+      <span class="g-val" id="lat-val">0.00g</span>
+    </div>
+    <div class="g-row" style="margin-top:8px">
+      <span class="g-label">Long.</span>
+      <div class="g-bar-track"><div class="g-bar" id="long-bar"></div></div>
+      <span class="g-val" id="long-val">0.00g</span>
+    </div>
+  </div>
+
+  <!-- Turn warning -->
+  <div id="turn-card">
+    <div id="turn-distance"></div>
+    <div id="turn-label">Max speed for next turn</div>
+    <div id="turn-speed"></div>
+  </div>
+
+  <!-- Status -->
+  <div id="status-bar">
+    <span id="road-name"></span>
+    <span id="status-msg">Waiting...</span>
+  </div>
+
+  <script>
+    // ── Config ──────────────────────────────────────────────────────────────
+    const CFG = {
+      lateralGLimit:  0.30,   // g — harsh cornering threshold
+      longGLimit:     0.40,   // g — harsh braking/acceleration threshold
+      aThreshold:     0.30 * 9.81, // m/s² — lateral accel for turn speed calc
+      queryMinDist:   150,    // m  — re-query Overpass after moving this far
+      lookahead:      500,    // m  — look this far ahead for turns
+      turnAngleMin:   15,     // °  — min heading change to count as a turn
+      smoothingAlpha: 0.15,   // EMA smoothing for accelerometer
+      urgentDist:     200,    // m  — turn warning becomes urgent below this
+    };
+
+    // ── State ────────────────────────────────────────────────────────────────
+    const S = {
+      lat: null, lon: null, speed: 0, heading: null, accuracy: null,
+      lastQueryLat: null, lastQueryLon: null,
+      ways: [], nodes: {},
+      speedLimit: null, roadName: null,
+      nextTurn: null,
+      latG: 0, longG: 0,
+      smoothLat: 0, smoothLong: 0,
+    };
+
+    // ── Geo math ─────────────────────────────────────────────────────────────
+    const toRad = d => d * Math.PI / 180;
+    const toDeg = r => r * 180 / Math.PI;
+
+    function haversine(lat1, lon1, lat2, lon2) {
+      const R = 6371000;
+      const dLat = toRad(lat2 - lat1), dLon = toRad(lon2 - lon1);
+      const a = Math.sin(dLat/2)**2
+              + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon/2)**2;
+      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    }
+
+    function bearing(lat1, lon1, lat2, lon2) {
+      const dLon = toRad(lon2 - lon1);
+      const y = Math.sin(dLon) * Math.cos(toRad(lat2));
+      const x = Math.cos(toRad(lat1)) * Math.sin(toRad(lat2))
+              - Math.sin(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.cos(dLon);
+      return (toDeg(Math.atan2(y, x)) + 360) % 360;
+    }
+
+    // Signed angular difference, result in [-180, 180]
+    function angleDiff(a, b) {
+      return Math.abs(((b - a + 540) % 360) - 180);
+    }
+
+    // Circumradius of the triangle formed by 3 geo points
+    function circumradius(p1, p2, p3) {
+      const a = haversine(p2.lat, p2.lon, p3.lat, p3.lon);
+      const b = haversine(p1.lat, p1.lon, p3.lat, p3.lon);
+      const c = haversine(p1.lat, p1.lon, p2.lat, p2.lon);
+      const s = (a + b + c) / 2;
+      const area = Math.sqrt(Math.max(0, s*(s-a)*(s-b)*(s-c)));
+      return area < 0.5 ? Infinity : (a * b * c) / (4 * area);
+    }
+
+    // Point-to-segment distance (approximate, using lat/lon directly)
+    function distToSegment(lat, lon, n1, n2) {
+      const dx = n2.lon - n1.lon, dy = n2.lat - n1.lat;
+      const lenSq = dx*dx + dy*dy;
+      if (lenSq === 0) return haversine(lat, lon, n1.lat, n1.lon);
+      const t = Math.max(0, Math.min(1, ((lon-n1.lon)*dx + (lat-n1.lat)*dy) / lenSq));
+      return haversine(lat, lon, n1.lat + t*dy, n1.lon + t*dx);
+    }
+
+    // ── Overpass API ─────────────────────────────────────────────────────────
+    async function queryRoads(lat, lon) {
+      setStatus('Loading road data…');
+      const q = `[out:json][timeout:10];
+way(around:300,${lat},${lon})[highway~"motorway|trunk|primary|secondary|tertiary|unclassified|residential|motorway_link|trunk_link|primary_link|secondary_link|tertiary_link"];
+(._;>;);out body;`;
+      const res = await fetch('https://overpass-api.de/api/interpreter', {
+        method: 'POST',
+        body: 'data=' + encodeURIComponent(q),
+      });
+      const data = await res.json();
+
+      S.nodes = {};
+      S.ways = [];
+      for (const el of data.elements) {
+        if (el.type === 'node') S.nodes[el.id] = { lat: el.lat, lon: el.lon };
+      }
+      for (const el of data.elements) {
+        if (el.type === 'way') S.ways.push(el);
+      }
+      S.lastQueryLat = lat;
+      S.lastQueryLon = lon;
+      matchRoad();
+    }
+
+    // ── Map matching ─────────────────────────────────────────────────────────
+    function matchRoad() {
+      if (S.lat === null || S.ways.length === 0) return;
+
+      let best = null, bestDist = Infinity;
+
+      for (const way of S.ways) {
+        const ids = way.nodes;
+        for (let i = 0; i < ids.length - 1; i++) {
+          const n1 = S.nodes[ids[i]], n2 = S.nodes[ids[i+1]];
+          if (!n1 || !n2) continue;
+          const d = distToSegment(S.lat, S.lon, n1, n2);
+          if (d < bestDist) {
+            bestDist = d;
+            const segBear = bearing(n1.lat, n1.lon, n2.lat, n2.lon);
+            const forward = S.heading === null || angleDiff(S.heading, segBear) < 90;
+            best = { way, nodeIdx: forward ? i + 1 : i, forward };
+          }
+        }
+      }
+
+      if (!best) return;
+
+      const tags = best.way.tags || {};
+      S.speedLimit = parseSpeed(tags.maxspeed);
+      S.roadName   = tags.name || tags.ref || null;
+      lookAhead(best.way, best.nodeIdx, best.forward);
+    }
+
+    function parseSpeed(tag) {
+      if (!tag) return null;
+      const m = tag.match(/^(\d+)/);
+      if (!m) return null;
+      const v = parseInt(m[1]);
+      return tag.toLowerCase().includes('mph') ? Math.round(v * 1.60934) : v;
+    }
+
+    // ── Look-ahead & turn detection ──────────────────────────────────────────
+    function lookAhead(way, startIdx, forward) {
+      const ids = way.nodes;
+      const pts = [];
+      let dist = 0;
+      const step = forward ? 1 : -1;
+
+      for (let i = startIdx; i >= 0 && i < ids.length; i += step) {
+        const n = S.nodes[ids[i]];
+        if (!n) break;
+        if (pts.length > 0) {
+          const prev = pts[pts.length - 1];
+          dist += haversine(prev.lat, prev.lon, n.lat, n.lon);
+        }
+        pts.push({ lat: n.lat, lon: n.lon, dist });
+        if (dist > CFG.lookahead) break;
+      }
+
+      S.nextTurn = findTurn(pts);
+    }
+
+    function findTurn(pts) {
+      if (pts.length < 3) return null;
+
+      for (let i = 1; i < pts.length - 1; i++) {
+        const b1 = bearing(pts[i-1].lat, pts[i-1].lon, pts[i].lat,   pts[i].lon);
+        const b2 = bearing(pts[i].lat,   pts[i].lon,   pts[i+1].lat, pts[i+1].lon);
+        const angle = angleDiff(b1, b2);
+
+        if (angle >= CFG.turnAngleMin) {
+          const r = circumradius(pts[i-1], pts[i], pts[i+1]);
+          const maxKmh = Math.round(Math.sqrt(CFG.aThreshold * r) * 3.6);
+          return { distance: Math.round(pts[i].dist), maxSpeed: maxKmh };
+        }
+      }
+      return null;
+    }
+
+    // ── GPS ──────────────────────────────────────────────────────────────────
+    function initGPS() {
+      if (!navigator.geolocation) { setStatus('No GPS support'); return; }
+      navigator.geolocation.watchPosition(onPos, onGPSErr, {
+        enableHighAccuracy: true,
+        maximumAge: 1000,
+        timeout: 15000,
+      });
+    }
+
+    function onPos(pos) {
+      const { latitude: lat, longitude: lon, speed, heading, accuracy } = pos.coords;
+      S.lat = lat; S.lon = lon;
+      S.speed   = speed    ?? 0;
+      S.heading = heading;
+      S.accuracy = accuracy;
+
+      const moved = S.lastQueryLat === null
+        ? Infinity
+        : haversine(lat, lon, S.lastQueryLat, S.lastQueryLon);
+
+      if (moved > CFG.queryMinDist) {
+        queryRoads(lat, lon).catch(() => setStatus('Road data unavailable'));
+      } else {
+        matchRoad();
+      }
+
+      renderDashboard();
+    }
+
+    function onGPSErr(err) { setStatus('GPS: ' + err.message); }
+
+    // ── Accelerometer ─────────────────────────────────────────────────────────
+    function initMotion() {
+      const handler = (e) => {
+        const acc = e.accelerationIncludingGravity;
+        if (!acc) return;
+        const a = CFG.smoothingAlpha;
+        // Portrait phone: X = lateral, Y = longitudinal
+        S.smoothLat  = a * Math.abs(acc.x ?? 0) / 9.81 + (1-a) * S.smoothLat;
+        S.smoothLong = a * Math.abs(acc.y ?? 0) / 9.81 + (1-a) * S.smoothLong;
+        S.latG  = S.smoothLat;
+        S.longG = S.smoothLong;
+        renderGMeters();
+      };
+
+      // iOS 13+ requires permission via user gesture
+      if (typeof DeviceMotionEvent !== 'undefined' &&
+          typeof DeviceMotionEvent.requestPermission === 'function') {
+        DeviceMotionEvent.requestPermission()
+          .then(r => { if (r === 'granted') window.addEventListener('devicemotion', handler); })
+          .catch(() => {});
+      } else {
+        window.addEventListener('devicemotion', handler);
+      }
+    }
+
+    // ── Render ────────────────────────────────────────────────────────────────
+    function renderDashboard() {
+      const kmh = Math.round((S.speed ?? 0) * 3.6);
+      document.getElementById('speed-value').textContent = kmh;
+
+      const limitEl = document.getElementById('speed-limit-value');
+      if (S.speedLimit) {
+        limitEl.textContent = S.speedLimit;
+        limitEl.style.color = kmh > S.speedLimit ? '#e33' : '#f90';
+      } else {
+        limitEl.textContent = '--';
+        limitEl.style.color = '#555';
+      }
+
+      document.getElementById('road-name').textContent = S.roadName ?? '';
+
+      const turnCard = document.getElementById('turn-card');
+      if (S.nextTurn) {
+        const { distance, maxSpeed } = S.nextTurn;
+        const urgent = distance < CFG.urgentDist || kmh > maxSpeed;
+        document.getElementById('turn-distance').textContent = `Turn in ${distance} m`;
+        document.getElementById('turn-speed').textContent    = `${maxSpeed} km/h`;
+        turnCard.classList.add('visible');
+        turnCard.classList.toggle('urgent', urgent);
+      } else {
+        turnCard.classList.remove('visible', 'urgent');
+      }
+
+      setStatus(`±${Math.round(S.accuracy ?? 0)} m · ${S.ways.length} roads`);
+    }
+
+    function renderGMeters() {
+      setBar('lat',  S.latG,  CFG.lateralGLimit);
+      setBar('long', S.longG, CFG.longGLimit);
+    }
+
+    function setBar(id, value, limit) {
+      const pct = Math.min(100, (value / (limit * 2)) * 100);
+      const bar = document.getElementById(id + '-bar');
+      bar.style.width = pct + '%';
+      bar.className = 'g-bar'
+        + (value > limit ? ' over' : value > limit * 0.7 ? ' warn' : '');
+      document.getElementById(id + '-val').textContent = value.toFixed(2) + 'g';
+    }
+
+    function setStatus(msg) {
+      document.getElementById('status-msg').textContent = msg;
+    }
+
+    // ── Start ─────────────────────────────────────────────────────────────────
+    document.getElementById('start-btn').addEventListener('click', () => {
+      document.getElementById('start-screen').style.display = 'none';
+      initGPS();
+      initMotion();
+    });
+  </script>
+</body>
+</html>
