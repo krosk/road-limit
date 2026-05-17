@@ -480,8 +480,11 @@
     function getRoadFeatures() {
       if (_mockFeatures !== null) return _mockFeatures;
       if (!map || !map.isStyleLoaded() || roadLayers.length === 0) return [];
-      const f = map.queryRenderedFeatures({ layers: roadLayers });
-      window.__lastFeatures = f; // copy from DevTools to build test fixtures
+      // Query all rendered features and keep only LineStrings.
+      // Filtering by roadLayers (transportation source-layer only) misses roads
+      // rendered by other layers (paths, service roads, certain road categories).
+      const f = map.queryRenderedFeatures().filter(f => f.geometry?.type === 'LineString');
+      window.__lastFeatures = f;
       return f;
     }
 
