@@ -480,7 +480,20 @@
     function getRoadFeatures() {
       if (_mockFeatures !== null) return _mockFeatures;
       if (!map || !map.isStyleLoaded() || roadLayers.length === 0) return [];
-      const f = map.queryRenderedFeatures({ layers: roadLayers });
+      const raw = map.queryRenderedFeatures({ layers: roadLayers });
+      // MapLibre returns MultiLineString for roads that cross tile boundaries.
+      // Expand each into individual LineString features so lib code handles them.
+      const f = [];
+      for (const feat of raw) {
+        const type = feat.geometry?.type;
+        if (type === 'LineString') {
+          f.push(feat);
+        } else if (type === 'MultiLineString') {
+          for (const coords of feat.geometry.coordinates) {
+            f.push({ ...feat, geometry: { type: 'LineString', coordinates: coords } });
+          }
+        }
+      }
       window.__lastFeatures = f;
       return f;
     }
