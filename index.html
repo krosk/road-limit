@@ -418,7 +418,7 @@
       smoothAlpha:       0.15,
       urgentDist:        200,
       minSpeedForHeading: 5 / 3.6,
-      roadMatchMaxDist:  30,
+      roadMatchMaxDist:  100,
     };
 
     // ── State ──────────────────────────────────────────────────────────────────
@@ -719,7 +719,7 @@
       // maxRadius: curves with safe speed above 150 km/h at current threshold are ignored
       const maxTurnRadius = (150 / 3.6) ** 2 / CFG.aThreshold;
       const segments = segmentsAhead(
-        features, S.lon, S.lat, S.heading, CFG.lookahead, maxTurnRadius, CFG.lookahead
+        features, S.lon, S.lat, S.heading, CFG.lookahead, maxTurnRadius, CFG.lookahead, CFG.roadMatchMaxDist
       );
 
       // Update map overlays
@@ -749,7 +749,8 @@
 
       // Status
       const roadCount = features.length;
-      setStatus(`±${Math.round(S.accuracy ?? 0)} m · ${roadCount} roads`);
+      const distStr = match ? `${Math.round(match.dist)} m to road` : 'no road';
+      setStatus(`±${Math.round(S.accuracy ?? 0)} m · ${roadCount} tiles · ${distStr}`);
     }
 
     function renderGMeters() {
