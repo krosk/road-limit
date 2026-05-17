@@ -446,21 +446,22 @@
 
     function updateSegmentOverlay(segments, currentSpeedKmh) {
       if (!map || !map.getSource('segments-ahead')) return;
-      const features = segments
-        .filter(seg => seg.turn !== null)
-        .map(seg => {
+      const features = segments.map(seg => {
+        let color = '#888'; // straight road — visible but neutral
+        if (seg.turn) {
           const limit = corneringSpeed(seg.turn.radius, CFG.aThreshold);
-          let color = '#3a9';
           if (limit !== null) {
             if (currentSpeedKmh > limit)           color = '#e33';
             else if (currentSpeedKmh > limit - 10) color = '#f90';
+            else                                   color = '#3a9';
           }
-          return {
-            type: 'Feature',
-            geometry: { type: 'LineString', coordinates: seg.pts },
-            properties: { color },
-          };
-        });
+        }
+        return {
+          type: 'Feature',
+          geometry: { type: 'LineString', coordinates: seg.pts },
+          properties: { color },
+        };
+      });
       map.getSource('segments-ahead').setData({ type: 'FeatureCollection', features });
     }
 
