@@ -593,7 +593,7 @@
       // maxRadius: curves with safe speed above 150 km/h at current threshold are ignored
       const maxTurnRadius = (150 / 3.6) ** 2 / CFG.aThreshold;
       const segments = segmentsAhead(
-        features, S.lon, S.lat, S.heading, CFG.lookahead, maxTurnRadius
+        features, S.lon, S.lat, S.heading, CFG.lookahead, maxTurnRadius, CFG.lookahead
       );
 
       // Update map overlays

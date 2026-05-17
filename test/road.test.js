@@ -197,3 +197,27 @@ test('segmentsAhead: road going east, heading west → 0 segments', () => {
   const segs = segmentsAhead(features, lon, lat, 270, 500);
   assert.strictEqual(segs.length, 0, `Expected 0 segments, got ${segs.length}`);
 });
+
+test('segmentsAhead: lookBehind > 0 → includes segment behind car', () => {
+  // Car at lon=2.350, heading east (90°)
+  // Road extends both west (behind) and east (ahead)
+  const lon = 2.350, lat = 48.853;
+  const features = [{
+    type: 'Feature',
+    geometry: {
+      type: 'LineString',
+      coordinates: [
+        [2.346, 48.853],  // behind
+        [2.348, 48.853],  // behind
+        [2.350, 48.853],  // at car
+        [2.352, 48.853],  // ahead
+        [2.354, 48.853],  // ahead
+      ],
+    },
+    properties: {},
+  }];
+  const segsNoLookBehind = segmentsAhead(features, lon, lat, 90, 500, 2000, 0);
+  const segsWithLookBehind = segmentsAhead(features, lon, lat, 90, 500, 2000, 500);
+  assert.strictEqual(segsNoLookBehind.length, 1, `Without lookBehind expected 1, got ${segsNoLookBehind.length}`);
+  assert.strictEqual(segsWithLookBehind.length, 2, `With lookBehind expected 2, got ${segsWithLookBehind.length}`);
+});
