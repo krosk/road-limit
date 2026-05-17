@@ -625,7 +625,7 @@
       S.prevLat = lat;
       S.prevLon = lon;
 
-      setPosInputs(lon, lat, S.heading);
+      setPosInputs(lon, lat, S.lastHeading);
       updateCarPosition(lon, lat);
       renderDashboard();
     }
