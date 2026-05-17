@@ -524,6 +524,17 @@
       carMarker = new maplibregl.Marker({ element: dotEl })
         .setLngLat([2.3522, 48.8566])
         .addTo(map);
+
+      // In manual mode, dragging the map moves the car to the map centre
+      map.on('drag', () => {
+        if (posMode !== 'manual') return;
+        const { lng, lat } = map.getCenter();
+        S.lon = lng;
+        S.lat = lat;
+        setPosInputs(lng, lat, S.heading);
+        carMarker.setLngLat([lng, lat]);
+        renderDashboard();
+      });
     }
 
     function updateCarPosition(lon, lat) {
