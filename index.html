@@ -202,6 +202,48 @@
       flex-shrink: 0;
     }
 
+    /* Manual position input row */
+    .pos-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid #2a2a2a;
+      flex-wrap: wrap;
+    }
+
+    #pos-toggle {
+      background: #2a2a2a;
+      color: #fff;
+      border: none;
+      border-radius: 12px;
+      padding: 4px 12px;
+      font-size: 12px;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+
+    #pos-toggle.active { background: #f90; color: #000; }
+
+    #pos-inputs {
+      display: none;
+      gap: 6px;
+      flex: 1;
+      flex-wrap: wrap;
+    }
+
+    #pos-inputs input {
+      width: 76px;
+      background: #1a1a1a;
+      border: 1px solid #333;
+      border-radius: 6px;
+      color: #fff;
+      font-size: 12px;
+      padding: 4px 6px;
+      outline: none;
+    }
+
     /* Speed badges on map */
     .speed-badge {
       width: 36px;
@@ -314,6 +356,15 @@
       <span id="threshold-val">0.30 g</span>
     </div>
 
+    <div class="pos-row">
+      <button id="pos-toggle">Manual</button>
+      <div id="pos-inputs">
+        <input type="number" id="pos-lon" placeholder="Lon" step="0.0001">
+        <input type="number" id="pos-lat" placeholder="Lat" step="0.0001">
+        <input type="number" id="pos-hdg" placeholder="Hdg°" min="0" max="359" step="1">
+      </div>
+    </div>
+
     <div id="status-msg">Waiting…</div>
     <div id="version-msg" style="font-size:10px;color:#fff;margin-top:2px;text-align:right;"></div>
   </div>
@@ -360,6 +411,37 @@
     window.__setMockFeatures = (f) => { _mockFeatures = f; };
     if (window.__mockFeatures !== undefined) _mockFeatures = window.__mockFeatures;
 
+    // ── Manual position mode ───────────────────────────────────────────────────
+    let posMode = 'gps';
+
+    function applyManualPos() {
+      const lon = parseFloat(document.getElementById('pos-lon').value);
+      const lat = parseFloat(document.getElementById('pos-lat').value);
+      const hdg = parseFloat(document.getElementById('pos-hdg').value);
+      if (isNaN(lon) || isNaN(lat)) return;
+      S.lon = lon;
+      S.lat = lat;
+      if (!isNaN(hdg)) { S.heading = hdg; S.lastHeading = hdg; }
+      updateCarPosition(lon, lat);
+      renderDashboard();
+    }
+
+    document.getElementById('pos-toggle').addEventListener('click', () => {
+      posMode = posMode === 'gps' ? 'manual' : 'gps';
+      const btn = document.getElementById('pos-toggle');
+      const inputs = document.getElementById('pos-inputs');
+      btn.textContent = posMode === 'gps' ? 'Manual' : 'GPS';
+      btn.classList.toggle('active', posMode === 'manual');
+      inputs.style.display = posMode === 'manual' ? 'flex' : 'none';
+      if (posMode === 'manual') applyManualPos();
+    });
+
+    ['pos-lon', 'pos-lat', 'pos-hdg'].forEach(id => {
+      document.getElementById(id).addEventListener('input', () => {
+        if (posMode === 'manual') applyManualPos();
+      });
+    });
+
     // ── Map & markers ──────────────────────────────────────────────────────────
     let map = null;
     let roadLayers = [];
@@ -369,7 +451,9 @@
     function getRoadFeatures() {
       if (_mockFeatures !== null) return _mockFeatures;
       if (!map || !map.isStyleLoaded() || roadLayers.length === 0) return [];
-      return map.queryRenderedFeatures({ layers: roadLayers });
+      const f = map.queryRenderedFeatures({ layers: roadLayers });
+      window.__lastFeatures = f; // copy from DevTools to build test fixtures
+      return f;
     }
 
     function initMap() {
@@ -478,6 +562,7 @@
     }
 
     function onPos(pos) {
+      if (posMode === 'manual') return;
       const { latitude: lat, longitude: lon, speed, heading, accuracy } = pos.coords;
 
       S.lat = lat;
