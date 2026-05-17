@@ -275,12 +275,25 @@
     </div>
 
     <div id="status-msg">Waiting…</div>
+    <div id="version-msg" style="font-size:10px;color:#333;margin-top:2px;text-align:right;"></div>
   </div>
 
   <script type="module">
     import { haversine, bearingTo, angleDiff, destPoint } from './lib/geo.js';
     import { matchRoad, collectAhead, detectTurn, corneringSpeed, segmentsAhead, isSingleRoadAhead, parseSpeed } from './lib/road.js';
     import { gravityInDeviceFrame, removeGravity, phoneToWorldFrame, worldToCarFrame, applyEMA } from './lib/motion.js';
+
+    // Show deployed timestamp from the file's Last-Modified header
+    fetch('index.html', { method: 'HEAD' })
+      .then(r => {
+        const lm = r.headers.get('Last-Modified');
+        if (lm) {
+          const d = new Date(lm);
+          document.getElementById('version-msg').textContent =
+            'Deployed ' + d.toISOString().slice(0, 16).replace('T', ' ') + ' UTC';
+        }
+      })
+      .catch(() => {});
 
     // ── Config ─────────────────────────────────────────────────────────────────
     const CFG = {
