@@ -156,6 +156,13 @@ test('isSingleRoadAhead: 2 segments → false', () => {
   ]), false);
 });
 
+test('isSingleRoadAhead: 1 forward + 1 behind → true (behind not counted)', () => {
+  assert.strictEqual(isSingleRoadAhead([
+    { pts: [], speedLimit: null, turn: null, isBehind: true },
+    { pts: [], speedLimit: null, turn: null },
+  ]), true);
+});
+
 // ── segmentsAhead ────────────────────────────────────────────────────────────
 
 test('segmentsAhead: road going east, heading east → 1 segment', () => {

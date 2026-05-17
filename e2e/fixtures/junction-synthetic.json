@@ -1,0 +1,28 @@
+[
+  {
+    "type": "Feature",
+    "geometry": {
+      "type": "LineString",
+      "coordinates": [
+        [2.3460, 48.8530],
+        [2.3480, 48.8530],
+        [2.3500, 48.8530],
+        [2.3520, 48.8530]
+      ]
+    },
+    "properties": { "maxspeed": "50" }
+  },
+  {
+    "type": "Feature",
+    "geometry": {
+      "type": "LineString",
+      "coordinates": [
+        [2.3500, 48.8510],
+        [2.3500, 48.8530],
+        [2.3500, 48.8550],
+        [2.3500, 48.8570]
+      ]
+    },
+    "properties": { "maxspeed": "50" }
+  }
+]

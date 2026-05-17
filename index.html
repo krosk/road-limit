@@ -387,6 +387,12 @@
         <button id="pos-apply" disabled>Apply</button>
       </div>
     </div>
+    <div class="pos-row" style="margin-top:6px;padding-top:6px;">
+      <span style="font-size:11px;color:#888;flex-shrink:0;width:44px;">Dist m</span>
+      <input type="number" id="match-dist" value="100" min="10" max="500" step="10"
+             style="width:72px;background:#1a1a1a;border:1px solid #333;border-radius:6px;color:#fff;font-size:12px;padding:4px 6px;outline:none;">
+      <span style="font-size:11px;color:#888;">road match</span>
+    </div>
 
     <div id="status-msg">Waiting…</div>
     <div id="version-msg" style="font-size:10px;color:#fff;margin-top:2px;text-align:right;"></div>
@@ -753,7 +759,7 @@
       // Turn warning
       const turnEl = document.getElementById('turn-warning');
       if (isSingleRoadAhead(segments)) {
-        const seg = segments[0];
+        const seg = segments.find(s => !s.isBehind);
         if (seg.turn) {
           const limit = seg.speedLimit ?? corneringSpeed(seg.turn.radius, CFG.aThreshold);
           const maxSpeed = limit ?? 0;
@@ -805,6 +811,15 @@
       renderGMeters();
     });
 
+    // ── Match distance input ───────────────────────────────────────────────────
+    document.getElementById('match-dist').addEventListener('input', (e) => {
+      const v = parseFloat(e.target.value);
+      if (isFinite(v) && v > 0) {
+        CFG.roadMatchMaxDist = v;
+        if (S.lat !== null) renderDashboard();
+      }
+    });
+
     // ── Start button ───────────────────────────────────────────────────────────
     document.getElementById('start-btn').addEventListener('click', async () => {
       // iOS DeviceMotion permission
@@ -816,9 +831,9 @@
       }
 
       document.getElementById('start-screen').style.display = 'none';
-      initMap();
       initGPS();
       initMotion();
+      try { initMap(); } catch (e) { console.error('Map init failed:', e); }
     });
   </script>
 

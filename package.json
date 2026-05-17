@@ -4,10 +4,10 @@
   "type": "module",
   "scripts": {
     "test:unit": "node --test test/*.test.js",
-    "test:e2e": "playwright test",
+    "test:e2e": "PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers playwright test",
     "test": "npm run test:unit && npm run test:e2e"
   },
   "devDependencies": {
-    "@playwright/test": "^1.49.0"
+    "@playwright/test": "^1.56.1"
   }
 }

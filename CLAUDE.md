@@ -23,11 +23,12 @@ lib/
   road.js               road matching, lookahead, turn detection, badge logic
   motion.js             accelerometer calibration (Option C rotation matrix)
 test/
-  geo.test.js           44 unit tests total across the three lib files
+  geo.test.js           45 unit tests total across the three lib files
   road.test.js
   motion.test.js
 e2e/
   dashboard.spec.js     Playwright: mocks GPS + queryRenderedFeatures
+  fixtures/             JSON road-feature fixtures for replay testing
 docs/adr/               architecture decision records
 ```
 
