@@ -427,8 +427,9 @@
       badgeMarkers = [];
 
       for (const seg of segments) {
-        const { speedLimit, turn, midpoint } = seg;
-        const limit = speedLimit ?? (turn ? corneringSpeed(turn.radius, CFG.aThreshold) : null);
+        const { turn, midpoint } = seg;
+        if (!turn) continue;
+        const limit = corneringSpeed(turn.radius, CFG.aThreshold);
         if (limit === null) continue;
 
         const el = document.createElement('div');
@@ -445,20 +446,21 @@
 
     function updateSegmentOverlay(segments, currentSpeedKmh) {
       if (!map || !map.getSource('segments-ahead')) return;
-      const features = segments.map(seg => {
-        const limit = seg.speedLimit ?? (seg.turn ? corneringSpeed(seg.turn.radius, CFG.aThreshold) : null);
-        let color = '#888';
-        if (limit !== null) {
-          if (currentSpeedKmh > limit)          color = '#e33';
-          else if (currentSpeedKmh > limit - 10) color = '#f90';
-          else                                   color = '#3a9';
-        }
-        return {
-          type: 'Feature',
-          geometry: { type: 'LineString', coordinates: seg.pts },
-          properties: { color },
-        };
-      });
+      const features = segments
+        .filter(seg => seg.turn !== null)
+        .map(seg => {
+          const limit = corneringSpeed(seg.turn.radius, CFG.aThreshold);
+          let color = '#3a9';
+          if (limit !== null) {
+            if (currentSpeedKmh > limit)           color = '#e33';
+            else if (currentSpeedKmh > limit - 10) color = '#f90';
+          }
+          return {
+            type: 'Feature',
+            geometry: { type: 'LineString', coordinates: seg.pts },
+            properties: { color },
+          };
+        });
       map.getSource('segments-ahead').setData({ type: 'FeatureCollection', features });
     }
 
