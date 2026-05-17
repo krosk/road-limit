@@ -347,6 +347,22 @@
         roadLayers = map.getStyle().layers
           .filter(l => l['source-layer'] === 'transportation' && l.type === 'line')
           .map(l => l.id);
+
+        map.addSource('segments-ahead', {
+          type: 'geojson',
+          data: { type: 'FeatureCollection', features: [] },
+        });
+        map.addLayer({
+          id: 'segments-ahead-line',
+          type: 'line',
+          source: 'segments-ahead',
+          paint: {
+            'line-color': ['get', 'color'],
+            'line-width': 6,
+            'line-opacity': 0.75,
+          },
+          layout: { 'line-cap': 'round', 'line-join': 'round' },
+        });
       });
 
       // Blue car dot marker
@@ -384,6 +400,25 @@
           .addTo(map);
         badgeMarkers.push(marker);
       }
+    }
+
+    function updateSegmentOverlay(segments, currentSpeedKmh) {
+      if (!map || !map.getSource('segments-ahead')) return;
+      const features = segments.map(seg => {
+        const limit = seg.speedLimit ?? (seg.turn ? corneringSpeed(seg.turn.radius, CFG.aThreshold) : null);
+        let color = '#888';
+        if (limit !== null) {
+          if (currentSpeedKmh > limit)          color = '#e33';
+          else if (currentSpeedKmh > limit - 10) color = '#f90';
+          else                                   color = '#3a9';
+        }
+        return {
+          type: 'Feature',
+          geometry: { type: 'LineString', coordinates: seg.pts },
+          properties: { color },
+        };
+      });
+      map.getSource('segments-ahead').setData({ type: 'FeatureCollection', features });
     }
 
     // ── GPS ────────────────────────────────────────────────────────────────────
@@ -516,8 +551,9 @@
         features, S.lon, S.lat, S.heading, CFG.lookahead, CFG.turnAngleMin
       );
 
-      // Update map badges
+      // Update map overlays
       updateBadges(segments, kmh);
+      updateSegmentOverlay(segments, kmh);
 
       // Turn warning
       const turnEl = document.getElementById('turn-warning');
