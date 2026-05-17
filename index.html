@@ -530,7 +530,9 @@
         .setLngLat([2.3522, 48.8566])
         .addTo(map);
 
-      // In manual mode, dragging the map moves the car to the map centre
+      // In manual mode, dragging the map moves the car to the map centre.
+      // queryRenderedFeatures returns 0 while tiles are loading, so we also
+      // re-render on idle (tiles fully loaded and rendered).
       map.on('drag', () => {
         if (posMode !== 'manual') return;
         const { lng, lat } = map.getCenter();
@@ -539,6 +541,10 @@
         setPosInputs(lng, lat, S.heading);
         carMarker.setLngLat([lng, lat]);
         renderDashboard();
+      });
+
+      map.on('idle', () => {
+        if (posMode === 'manual' && S.lat !== null) renderDashboard();
       });
     }
 
@@ -755,7 +761,7 @@
       // Status
       const roadCount = features.length;
       const distStr = match ? `${Math.round(match.dist)} m to road` : 'no road';
-      setStatus(`±${Math.round(S.accuracy ?? 0)} m · ${roadCount} tiles · ${distStr}`);
+      setStatus(`±${Math.round(S.accuracy ?? 0)} m · ${roadCount} roads [${roadLayers.length} layers] · ${distStr}`);
     }
 
     function renderGMeters() {
