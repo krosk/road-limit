@@ -198,6 +198,23 @@ test('segmentsAhead: road going east, heading west → 0 segments', () => {
   assert.strictEqual(segs.length, 0, `Expected 0 segments, got ${segs.length}`);
 });
 
+test('segmentsAhead: BFS reaches roads two hops from the current road', () => {
+  // Road A: car is on this, heading east
+  // Road B: connects to A's eastern end, goes north
+  // Road C: connects to B's northern end, goes east (two hops from car)
+  // Old one-level code misses C; BFS should include all three.
+  const lon = 2.348, lat = 48.853;
+  const roadA = { type: 'Feature', geometry: { type: 'LineString', coordinates:
+    [[2.346, 48.853], [2.350, 48.853], [2.352, 48.853]] }, properties: {} };
+  const roadB = { type: 'Feature', geometry: { type: 'LineString', coordinates:
+    [[2.352, 48.853], [2.352, 48.855], [2.352, 48.857]] }, properties: {} };
+  const roadC = { type: 'Feature', geometry: { type: 'LineString', coordinates:
+    [[2.352, 48.857], [2.354, 48.857], [2.356, 48.857]] }, properties: {} };
+
+  const segs = segmentsAhead([roadA, roadB, roadC], lon, lat, 90, 10000);
+  assert.ok(segs.length >= 3, `Expected at least 3 segments (A, B, C), got ${segs.length}`);
+});
+
 test('segmentsAhead: lookBehind > 0 → includes segment behind car', () => {
   // Car at lon=2.350, heading east (90°)
   // Road extends both west (behind) and east (ahead)
