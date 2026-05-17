@@ -214,17 +214,20 @@
     }
 
     #pos-toggle {
-      background: #2a2a2a;
+      background: transparent;
       color: #fff;
-      border: none;
+      border: 1px solid #666;
       border-radius: 12px;
-      padding: 4px 12px;
+      padding: 4px 0;
       font-size: 12px;
+      font-weight: 600;
       cursor: pointer;
       flex-shrink: 0;
+      width: 44px;
+      text-align: center;
     }
 
-    #pos-toggle.active { background: #f90; color: #000; }
+    #pos-toggle.active { background: #f90; color: #000; border-color: #f90; }
 
     #pos-inputs {
       display: flex;
@@ -456,7 +459,7 @@
       posMode = posMode === 'gps' ? 'manual' : 'gps';
       const btn = document.getElementById('pos-toggle');
       const isManual = posMode === 'manual';
-      btn.textContent = isManual ? 'Manual' : 'GPS';
+      btn.textContent = isManual ? 'SET' : 'GPS';
       btn.classList.toggle('active', isManual);
       ['pos-lon', 'pos-lat', 'pos-hdg'].forEach(id => {
         document.getElementById(id).readOnly = !isManual;
