@@ -163,6 +163,45 @@
       text-align: right;
     }
 
+    /* Threshold slider */
+    .slider-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid #2a2a2a;
+    }
+
+    .slider-row .g-label { width: 56px; flex-shrink: 0; }
+
+    #threshold-slider {
+      flex: 1;
+      -webkit-appearance: none;
+      appearance: none;
+      height: 4px;
+      border-radius: 2px;
+      background: #2a2a2a;
+      outline: none;
+    }
+
+    #threshold-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #f90;
+      cursor: pointer;
+    }
+
+    #threshold-val {
+      font-size: 12px;
+      font-variant-numeric: tabular-nums;
+      width: 42px;
+      text-align: right;
+      flex-shrink: 0;
+    }
+
     /* Speed badges on map */
     .speed-badge {
       width: 36px;
@@ -272,6 +311,12 @@
       <div id="turn-distance"></div>
       <div id="turn-label">Max speed for next turn</div>
       <div id="turn-speed"></div>
+    </div>
+
+    <div class="slider-row">
+      <span class="g-label">Threshold</span>
+      <input type="range" id="threshold-slider" min="0.10" max="0.50" step="0.05" value="0.30">
+      <span id="threshold-val">0.30 g</span>
     </div>
 
     <div id="status-msg">Waiting…</div>
@@ -598,6 +643,16 @@
     function setStatus(msg) {
       document.getElementById('status-msg').textContent = msg;
     }
+
+    // ── Threshold slider ───────────────────────────────────────────────────────
+    document.getElementById('threshold-slider').addEventListener('input', (e) => {
+      const g = parseFloat(e.target.value);
+      CFG.aThreshold    = g * 9.81;
+      CFG.lateralGLimit = g;
+      document.getElementById('threshold-val').textContent = g.toFixed(2) + ' g';
+      if (S.lat !== null) renderDashboard();
+      renderGMeters();
+    });
 
     // ── Start button ───────────────────────────────────────────────────────────
     document.getElementById('start-btn').addEventListener('click', async () => {
