@@ -341,7 +341,6 @@
       longGLimit:        0.40,
       aThreshold:        0.30 * 9.81,
       lookahead:         500,
-      turnAngleMin:      15,
       smoothAlpha:       0.15,
       urgentDist:        200,
       minSpeedForHeading: 5 / 3.6,
@@ -591,8 +590,10 @@
       }
 
       // Segments ahead
+      // maxRadius: curves with safe speed above 150 km/h at current threshold are ignored
+      const maxTurnRadius = (150 / 3.6) ** 2 / CFG.aThreshold;
       const segments = segmentsAhead(
-        features, S.lon, S.lat, S.heading, CFG.lookahead, CFG.turnAngleMin
+        features, S.lon, S.lat, S.heading, CFG.lookahead, maxTurnRadius
       );
 
       // Update map overlays

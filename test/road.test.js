@@ -87,31 +87,49 @@ test('collectAhead backward: starts at index 2, gets reversed coords', () => {
 
 // ── detectTurn ───────────────────────────────────────────────────────────────
 
-test('detectTurn: straight north points → null', () => {
-  // All points going straight north
+test('detectTurn: collinear points → null (circumradius = Infinity)', () => {
   const pts = [
     [2.0, 48.0],
     [2.0, 48.001],
     [2.0, 48.002],
     [2.0, 48.003],
   ];
-  const result = detectTurn(pts);
-  assert.strictEqual(result, null);
+  assert.strictEqual(detectTurn(pts), null);
 });
 
 test('detectTurn: 90° east-then-north turn → detected, angle 80–100°', () => {
-  // Going east then turning north — 90° turn
-  // ~111m per 0.001° lat, ~80m per 0.001° lon at lat 48
+  // ~74m east then ~111m north at lat 48 — circumradius ≈ 66m, well under default 2000m
   const pts = [
-    [2.0,     48.0],
-    [2.001,   48.0],    // going east
-    [2.001,   48.001],  // turning north
-    [2.001,   48.002],
+    [2.0,   48.0],
+    [2.001, 48.0],
+    [2.001, 48.001],
+    [2.001, 48.002],
   ];
   const result = detectTurn(pts);
   assert.ok(result !== null, 'Expected a turn to be detected');
   assert.ok(result.angle >= 80 && result.angle <= 100,
     `Expected angle 80–100°, got ${result.angle}`);
+});
+
+test('detectTurn: gentle curve below maxRadius threshold → detected', () => {
+  // Slight curve: go east, then slightly north-east — small angle but real curve
+  const pts = [
+    [2.0,   48.0],
+    [2.005, 48.0],
+    [2.010, 48.001], // gentle curve, large radius
+  ];
+  const result = detectTurn(pts, 100000); // very large maxRadius to catch gentle curves
+  assert.ok(result !== null, 'Expected gentle curve to be detected with large maxRadius');
+});
+
+test('detectTurn: gentle curve above maxRadius threshold → null', () => {
+  const pts = [
+    [2.0,   48.0],
+    [2.005, 48.0],
+    [2.010, 48.001],
+  ];
+  const result = detectTurn(pts, 10); // very small maxRadius — only extremely tight curves
+  assert.strictEqual(result, null);
 });
 
 // ── corneringSpeed ───────────────────────────────────────────────────────────
