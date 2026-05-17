@@ -480,10 +480,7 @@
     function getRoadFeatures() {
       if (_mockFeatures !== null) return _mockFeatures;
       if (!map || !map.isStyleLoaded() || roadLayers.length === 0) return [];
-      // Query all rendered features and keep only LineStrings.
-      // Filtering by roadLayers (transportation source-layer only) misses roads
-      // rendered by other layers (paths, service roads, certain road categories).
-      const f = map.queryRenderedFeatures().filter(f => f.geometry?.type === 'LineString');
+      const f = map.queryRenderedFeatures({ layers: roadLayers });
       window.__lastFeatures = f;
       return f;
     }
@@ -500,8 +497,13 @@
       });
 
       map.on('load', () => {
+        // All line-type layers, regardless of source-layer name.
+        // OpenFreeMap's liberty style may use source-layer names other than
+        // 'transportation' for certain road categories.
+        const NON_ROAD = new Set(['waterway', 'water', 'water_name', 'boundary',
+                                   'landcover', 'landuse', 'contour']);
         roadLayers = map.getStyle().layers
-          .filter(l => l['source-layer'] === 'transportation' && l.type === 'line')
+          .filter(l => l.type === 'line' && !NON_ROAD.has(l['source-layer']))
           .map(l => l.id);
 
         map.addSource('segments-ahead', {
