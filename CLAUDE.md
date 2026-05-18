@@ -9,6 +9,11 @@ against road speed limits from OpenStreetMap.
 The app is a static site with no build step. Pushing to `main` on GitHub
 automatically publishes it via GitHub Pages.
 
+## Git workflow
+
+Commit and push directly to `main` — no feature branches. All commits in
+the repository history follow this convention.
+
 ## Commands
 
 ```bash
