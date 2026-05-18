@@ -13,7 +13,8 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 //   4. Write a test using loadFixture('<name>')
 function loadFixture(name) {
   const p = join(__dirname, 'fixtures', `${name}.json`);
-  return JSON.parse(readFileSync(p, 'utf8'));
+  const raw = JSON.parse(readFileSync(p, 'utf8'));
+  return Array.isArray(raw) ? raw : raw.features;
 }
 
 // Helper: inject fake GPS before page load

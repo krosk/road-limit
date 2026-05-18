@@ -461,15 +461,16 @@
     import { computeTurnCard, segmentsGeoJSON, statusText, barState, badgeItems, debugTripletFeatures } from './lib/display.js';
 
     // Show deployed timestamp + commit SHA
+    let _commitSha = '';
     Promise.all([
       fetch('index.html', { method: 'HEAD' }).then(r => r.headers.get('Last-Modified')).catch(() => null),
       fetch('https://api.github.com/repos/krosk/road-limit/commits/main').then(r => r.json()).catch(() => null),
     ]).then(([lm, commit]) => {
       const dateStr = lm ? new Date(lm).toISOString().slice(0, 16).replace('T', ' ') + ' UTC' : '';
-      const shaStr  = commit?.sha ? commit.sha.slice(0, 7) : '';
-      const parts   = [dateStr && 'Deployed ' + dateStr, shaStr].filter(Boolean);
+      _commitSha = commit?.sha ? commit.sha.slice(0, 7) : '';
+      const parts   = [dateStr && 'Deployed ' + dateStr, _commitSha].filter(Boolean);
       if (parts.length) document.getElementById('version-msg').textContent = parts.join(' · ');
-    });;
+    });
 
     // ── Config ─────────────────────────────────────────────────────────────────
     const CFG = { ...DEFAULT_CFG };
@@ -859,6 +860,20 @@
       }
 
       setStatus(statusText(features, segments, match, S.accuracy, turnReason));
+
+      const forward = segments.filter(s => !s.isBehind);
+      window.__lastDiag = {
+        commit:      _commitSha,
+        timestamp:   new Date().toISOString(),
+        position:    { lon: S.lon, lat: S.lat, heading: S.heading, accuracy: S.accuracy },
+        speed:       kmh,
+        cfg:         { lookahead: CFG.lookahead, roadMatchMaxDist: CFG.roadMatchMaxDist, aThreshold: CFG.aThreshold },
+        match:       match ? { dist: Math.round(match.dist), road: match.feature.properties?.name ?? match.feature.properties?.ref ?? null, class: match.feature.properties?.class ?? null } : null,
+        segments:    { forward: forward.length, behind: segments.filter(s => s.isBehind).length },
+        forwardClasses: forward.map(s => s.pts?.length),
+        turnReason,
+        turnCard:    card,
+      };
     }
 
     function renderGMeters() {
@@ -935,7 +950,8 @@
         setTimeout(() => { btn.textContent = 'CPY'; }, 1000);
         return;
       }
-      const text = JSON.stringify(features);
+      const payload = { meta: window.__lastDiag ?? null, features };
+      const text = JSON.stringify(payload);
       const blob = new Blob([text], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
