@@ -32,7 +32,7 @@ lib/
   motion.js             accelerometer calibration (Option C rotation matrix)
   state.js              pure state update functions (applyGPS, smoothCompass,
                           applyMotion, createState)
-  display.js            pure display computation (computeCornerBadge,
+  display.js            pure display computation (computeTurnCard,
                           segmentLineColor, segmentsGeoJSON, statusText,
                           barState, badgeItems, debugTripletFeatures)
 test/
@@ -41,7 +41,7 @@ test/
   motion.test.js        unit tests for lib/motion.js
   state.test.js         unit tests for lib/state.js
   display.test.js       unit tests for lib/display.js
-                        123 unit tests total across all lib files
+                        131 unit tests total across all lib files
 e2e/
   dashboard.spec.js     Playwright: mocks GPS + road features
   fixtures/             JSON road-feature fixtures for replay testing
@@ -122,8 +122,12 @@ WebGL canvas. Consequences:
 - **Accelerometer calibration**: Option C — continuous transform using
   `deviceorientation` (β/γ) + GPS heading. No manual calibration step,
   self-corrects if phone shifts.
-- **Junction handling**: badges on all branches ahead; single-road turn
-  warning removed in favour of the persistent corner badge (top-right).
+- **Turn summary card**: replaces the old corner badge. `firstTurnAhead` in
+  `lib/road.js` runs `segmentsAhead` with the standard lookahead, returns null
+  for junctions (multiple forward segments) or no turn within lookahead.
+  `computeTurnCard` in `lib/display.js` formats it for display. Card shows
+  direction arrow (← / →), min cornering speed circle, distance and ETA to arc
+  start. Junction suppression: if BFS finds >1 forward segment, no card shown.
 - **segmentsAhead algorithm**: BFS over the connected road graph up to
   `CFG.lookahead` metres ahead only (lookBehind = 0). Starts from the
   matched road, explores both directions at every junction node, tracks
@@ -169,8 +173,9 @@ the bottom panel for live tuning without reloading.
 
 - **Top-left overlay**: speed (km/h), road name, map bearing + raw abs compass
   (`↑ X°  ·  Y°` where X = screen-top direction, Y = raw device compass).
-- **Top-right overlay**: large corner badge — cornering speed limit of the
-  nearest upcoming turn, with distance. Red background when over the limit.
+- **Top-right overlay**: turn summary card — direction arrow (← / →), min
+  cornering speed circle, distance and ETA to arc start. Red when over limit.
+  Hidden when no turn within lookahead or when approaching a junction.
 - **Bottom panel** (collapsible via `⌄` chevron):
   - G-force bars (lateral / longitudinal) — always visible
   - Threshold slider (lateral G limit)

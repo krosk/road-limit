@@ -1,7 +1,7 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  computeCornerBadge,
+  computeTurnCard,
   segmentLineColor,
   segmentsGeoJSON,
   statusText,
@@ -16,62 +16,50 @@ const pts = [[2, 48], [2.001, 48], [2.001, 48.001]];
 const makeSeg = (turns = [], isBehind = false) => ({ pts, turns, isBehind });
 const makeTurn = (distance, radius) => ({ distance, radius, angle: 45 });
 
-// ── computeCornerBadge ────────────────────────────────────────────────────────
+// ── computeTurnCard ────────────────────────────────────────────────────────────
 
-describe('computeCornerBadge', () => {
-  test('no segments → null', () => {
-    assert.equal(computeCornerBadge([], 50, A), null);
+describe('computeTurnCard', () => {
+  // corneringSpeed(100, 0.3*9.81) = Math.round(sqrt(2.943*100)*3.6) = 62 km/h
+  const baseTurn = { distanceToStart: 80, arcLength: 40, minRadius: 100, minSpeed: 62, direction: 'right' };
+
+  test('null input → null', () => {
+    assert.equal(computeTurnCard(null, 50), null);
   });
 
-  test('segment with no turns → null', () => {
-    assert.equal(computeCornerBadge([makeSeg([])], 50, A), null);
+  test('minSpeed null → null', () => {
+    assert.equal(computeTurnCard({ ...baseTurn, minSpeed: null }, 50), null);
   });
 
-  test('isBehind segment skipped → null', () => {
-    assert.equal(computeCornerBadge([makeSeg([makeTurn(50, 100)], true)], 50, A), null);
+  test('returns right direction', () => {
+    assert.equal(computeTurnCard(baseTurn, 30).direction, 'right');
   });
 
-  test('single turn — returns limit and distance', () => {
-    const badge = computeCornerBadge([makeSeg([makeTurn(50, 100)])], 30, A);
-    assert.notEqual(badge, null);
-    assert.equal(badge.distance, 50);
-    assert.ok(badge.limit > 0);
+  test('returns left direction', () => {
+    assert.equal(computeTurnCard({ ...baseTurn, direction: 'left' }, 30).direction, 'left');
   });
 
-  test('multiple turns in one segment — picks nearest', () => {
-    const badge = computeCornerBadge([makeSeg([makeTurn(80, 100), makeTurn(30, 100)])], 30, A);
-    assert.equal(badge.distance, 30);
+  test('distanceToStart rounded', () => {
+    assert.equal(computeTurnCard({ ...baseTurn, distanceToStart: 80.7 }, 30).distanceToStart, 81);
   });
 
-  test('multiple segments — picks nearest overall', () => {
-    const badge = computeCornerBadge([
-      makeSeg([makeTurn(80, 100)]),
-      makeSeg([makeTurn(20, 100)]),
-    ], 30, A);
-    assert.equal(badge.distance, 20);
+  test('isOver true when speed > minSpeed', () => {
+    assert.equal(computeTurnCard(baseTurn, 70).isOver, true);
   });
 
-  test('isBehind segment ignored when forward segment exists', () => {
-    const badge = computeCornerBadge([
-      makeSeg([makeTurn(10, 100)], true),
-      makeSeg([makeTurn(50, 100)]),
-    ], 30, A);
-    assert.equal(badge.distance, 50);
+  test('isOver false when speed < minSpeed', () => {
+    assert.equal(computeTurnCard(baseTurn, 50).isOver, false);
   });
 
-  test('speed over limit → isOver true', () => {
-    // corneringSpeed(50, 0.30*9.81) ≈ 44 km/h
-    const badge = computeCornerBadge([makeSeg([makeTurn(50, 50)])], 60, A);
-    assert.equal(badge.isOver, true);
+  test('timeToStart calculated from speed — 80 m at 72 km/h → 4 s', () => {
+    assert.equal(computeTurnCard(baseTurn, 72).timeToStart, 4);
   });
 
-  test('speed under limit → isOver false', () => {
-    const badge = computeCornerBadge([makeSeg([makeTurn(50, 50)])], 10, A);
-    assert.equal(badge.isOver, false);
+  test('timeToStart null when speed is 0', () => {
+    assert.equal(computeTurnCard(baseTurn, 0).timeToStart, null);
   });
 
-  test('Infinity radius → null (corneringSpeed returns null)', () => {
-    assert.equal(computeCornerBadge([makeSeg([makeTurn(50, Infinity)])], 50, A), null);
+  test('minSpeed passed through', () => {
+    assert.equal(computeTurnCard(baseTurn, 30).minSpeed, 62);
   });
 });
 

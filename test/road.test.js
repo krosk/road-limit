@@ -10,6 +10,7 @@ import {
   isSingleRoadAhead,
   segmentsAhead,
   normaliseFeatures,
+  firstTurnAhead,
 } from '../lib/road.js';
 import { haversine } from '../lib/geo.js';
 
@@ -269,6 +270,85 @@ test('segmentsAhead: lookBehind > 0 → includes segment behind car', () => {
   const segsWithLookBehind = segmentsAhead(features, lon, lat, 90, 500, 2000, 500);
   assert.strictEqual(segsNoLookBehind.length, 1, `Without lookBehind expected 1, got ${segsNoLookBehind.length}`);
   assert.strictEqual(segsWithLookBehind.length, 2, `With lookBehind expected 2, got ${segsWithLookBehind.length}`);
+});
+
+// ── firstTurnAhead ─────────────────────────────────────────────────────────────
+
+const A = 0.30 * 9.81;
+const MAX_R = 2000;
+
+const leftTurnFeature = {
+  type: 'Feature',
+  geometry: { type: 'LineString', coordinates: [
+    [2.0, 48.0], [2.001, 48.0], [2.002, 48.0], [2.002, 48.001],
+  ]},
+  properties: {},
+};
+
+const rightTurnFeature = {
+  type: 'Feature',
+  geometry: { type: 'LineString', coordinates: [
+    [2.0, 48.0], [2.001, 48.0], [2.002, 48.0], [2.002, 47.999],
+  ]},
+  properties: {},
+};
+
+const straightFeature = {
+  type: 'Feature',
+  geometry: { type: 'LineString', coordinates: [
+    [2.0, 48.0], [2.001, 48.0], [2.002, 48.0], [2.003, 48.0],
+  ]},
+  properties: {},
+};
+
+test('firstTurnAhead: no features → null', () => {
+  assert.strictEqual(firstTurnAhead([], 2.0, 48.0, 90, 500, MAX_R, A), null);
+});
+
+test('firstTurnAhead: straight road → null', () => {
+  assert.strictEqual(firstTurnAhead([straightFeature], 2.0, 48.0, 90, 500, MAX_R, A, 50), null);
+});
+
+test('firstTurnAhead: 90° left turn (east→north) within lookahead → direction left', () => {
+  const result = firstTurnAhead([leftTurnFeature], 2.0, 48.0, 90, 500, MAX_R, A, 50);
+  assert.ok(result !== null, 'Expected turn to be detected');
+  assert.strictEqual(result.direction, 'left');
+});
+
+test('firstTurnAhead: 90° right turn (east→south) within lookahead → direction right', () => {
+  const result = firstTurnAhead([rightTurnFeature], 2.0, 48.0, 90, 500, MAX_R, A, 50);
+  assert.ok(result !== null, 'Expected turn to be detected');
+  assert.strictEqual(result.direction, 'right');
+});
+
+test('firstTurnAhead: turn beyond lookahead → null', () => {
+  // Turn node is at cumdist ≈ 73 m — only find it with lookahead > 73 m
+  assert.strictEqual(firstTurnAhead([leftTurnFeature], 2.0, 48.0, 90, 50, MAX_R, A, 50), null);
+});
+
+test('firstTurnAhead: junction (2 forward segments) → null', () => {
+  // Branch road with second node ~89 m away — fits within 120 m budget
+  const branchFeature = {
+    type: 'Feature',
+    geometry: { type: 'LineString', coordinates: [
+      [2.001, 48.0], [2.001, 48.0008],
+    ]},
+    properties: {},
+  };
+  const result = firstTurnAhead([leftTurnFeature, branchFeature], 2.0, 48.0, 90, 120, MAX_R, A, 50);
+  assert.strictEqual(result, null);
+});
+
+test('firstTurnAhead: distanceToStart > 0 for non-immediate turn', () => {
+  const result = firstTurnAhead([leftTurnFeature], 2.0, 48.0, 90, 500, MAX_R, A, 50);
+  assert.ok(result !== null);
+  assert.ok(result.distanceToStart > 0, `Expected distanceToStart > 0, got ${result.distanceToStart}`);
+});
+
+test('firstTurnAhead: minSpeed > 0', () => {
+  const result = firstTurnAhead([leftTurnFeature], 2.0, 48.0, 90, 500, MAX_R, A, 50);
+  assert.ok(result !== null);
+  assert.ok(result.minSpeed !== null && result.minSpeed > 0);
 });
 
 // ── normaliseFeatures ─────────────────────────────────────────────────────────

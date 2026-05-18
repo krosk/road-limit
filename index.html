@@ -17,8 +17,8 @@
       position: relative;
     }
 
-    /* Nearest-turn badge: fixed top-right */
-    #corner-badge {
+    /* Turn summary card: fixed top-right */
+    #turn-card {
       position: absolute;
       top: 12px;
       right: 12px;
@@ -29,14 +29,20 @@
       gap: 6px;
     }
 
-    #corner-badge-speed {
+    #turn-card-arrow {
+      font-size: 32px;
+      line-height: 1;
+      filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.8));
+    }
+
+    #turn-card-speed {
       width: 80px;
       height: 80px;
       border-radius: 50%;
       background: #fff;
       border: 5px solid #e33;
       color: #000;
-      font-size: 30px;
+      font-size: 28px;
       font-weight: 700;
       display: flex;
       align-items: center;
@@ -44,17 +50,18 @@
       font-variant-numeric: tabular-nums;
     }
 
-    #corner-badge-speed.over {
+    #turn-card-speed.over {
       background: #e33;
       color: #fff;
     }
 
-    #corner-badge-dist {
+    #turn-card-info {
       font-size: 12px;
       color: #fff;
       background: rgba(17, 17, 17, 0.75);
       padding: 2px 8px;
       border-radius: 6px;
+      text-align: center;
     }
 
     /* Map: full screen */
@@ -379,10 +386,11 @@
   <!-- Map (full screen) -->
   <div id="map"></div>
 
-  <!-- Nearest-turn badge -->
-  <div id="corner-badge">
-    <div id="corner-badge-speed">—</div>
-    <div id="corner-badge-dist"></div>
+  <!-- Turn summary card -->
+  <div id="turn-card">
+    <div id="turn-card-arrow"></div>
+    <div id="turn-card-speed">—</div>
+    <div id="turn-card-info"></div>
   </div>
 
   <!-- Speed overlay -->
@@ -447,10 +455,10 @@
 
   <script type="module">
     import { haversine, bearingTo, destPoint, ptAtDistance, bearingAtDistance } from './lib/geo.js';
-    import { matchRoad, segmentsAhead, normaliseFeatures } from './lib/road.js';
+    import { matchRoad, segmentsAhead, normaliseFeatures, firstTurnAhead } from './lib/road.js';
     import { DEFAULT_CFG } from './lib/config.js';
     import { createState, applyGPS, smoothCompass, applyMotion } from './lib/state.js';
-    import { computeCornerBadge, segmentsGeoJSON, statusText, barState, badgeItems, debugTripletFeatures } from './lib/display.js';
+    import { computeTurnCard, segmentsGeoJSON, statusText, barState, badgeItems, debugTripletFeatures } from './lib/display.js';
 
     // Show deployed timestamp from the file's Last-Modified header
     fetch('index.html', { method: 'HEAD' })
@@ -824,17 +832,22 @@
       updateSegmentOverlay(segments, kmh);
       updateDebugTriplets(segments, maxTurnRadius);
 
-      // Nearest-turn corner badge
-      const badge = computeCornerBadge(segments, kmh, CFG.aThreshold);
-      const cornerBadge = document.getElementById('corner-badge');
-      if (badge !== null) {
-        cornerBadge.style.display = 'flex';
-        const speedEl = document.getElementById('corner-badge-speed');
-        speedEl.textContent = String(badge.limit);
-        speedEl.classList.toggle('over', badge.isOver);
-        document.getElementById('corner-badge-dist').textContent = `in ${Math.round(badge.distance)} m`;
+      // Turn summary card
+      const turnData = firstTurnAhead(
+        features, S.lon, S.lat, S.heading, CFG.lookahead, maxTurnRadius, CFG.aThreshold, CFG.roadMatchMaxDist
+      );
+      const card = computeTurnCard(turnData, kmh);
+      const turnCardEl = document.getElementById('turn-card');
+      if (card !== null) {
+        turnCardEl.style.display = 'flex';
+        document.getElementById('turn-card-arrow').textContent = card.direction === 'right' ? '→' : '←';
+        const speedEl = document.getElementById('turn-card-speed');
+        speedEl.textContent = String(card.minSpeed);
+        speedEl.classList.toggle('over', card.isOver);
+        const timeStr = card.timeToStart !== null ? `  ${card.timeToStart}s` : '';
+        document.getElementById('turn-card-info').textContent = `${card.distanceToStart} m${timeStr}`;
       } else {
-        cornerBadge.style.display = 'none';
+        turnCardEl.style.display = 'none';
       }
 
       setStatus(statusText(features, segments, match, S.accuracy));
