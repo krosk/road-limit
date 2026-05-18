@@ -672,9 +672,19 @@
       // In manual mode, dragging the map moves the car to the map centre.
       // queryRenderedFeatures returns 0 while tiles are loading, so we also
       // re-render on idle (tiles fully loaded and rendered).
+      let _dragPrev = null;
+      map.on('dragstart', () => { _dragPrev = null; });
       map.on('drag', () => {
         if (posMode !== 'manual') return;
         const { lng, lat } = map.getCenter();
+        if (_dragPrev !== null) {
+          const d = haversine(_dragPrev.lat, _dragPrev.lng, lat, lng);
+          if (d > 2) {
+            S.heading = bearingTo(_dragPrev.lat, _dragPrev.lng, lat, lng);
+            S.lastHeading = S.heading;
+          }
+        }
+        _dragPrev = { lng, lat };
         S.lon = lng;
         S.lat = lat;
         setPosInputs(lng, lat, S.heading);
