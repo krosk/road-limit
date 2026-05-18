@@ -66,7 +66,7 @@ All tunable constants are in `CFG` at the top of `index.html`:
 | `lateralGLimit` | 0.30 g | harsh cornering threshold |
 | `longGLimit` | 0.40 g | harsh braking/acceleration threshold |
 | `aThreshold` | 0.30 × 9.81 m/s² | lateral acceleration for turn speed formula |
-| `lookahead` | 60 m | scan distance ahead and behind the car |
+| `lookahead` | 120 m | scan distance ahead and behind the car |
 | `urgentDist` | 200 m | turn warning becomes urgent below this distance |
 | `roadMatchMaxDist` | 30 m | max distance from car to nearest road to start BFS |
 
