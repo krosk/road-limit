@@ -437,6 +437,7 @@
                style="width:72px;background:#1a1a1a;border:1px solid #333;border-radius:6px;color:#fff;font-size:12px;padding:4px 6px;outline:none;margin-left:12px;">
         <span style="font-size:11px;color:#888;">lookahead</span>
         <button id="dbg-toggle" style="background:transparent;color:#fff;border:1px solid #666;border-radius:12px;padding:4px 0;font-size:12px;font-weight:600;cursor:pointer;flex-shrink:0;width:44px;text-align:center;margin-left:auto;">DBG</button>
+        <button id="copy-roads-btn" style="background:transparent;color:#fff;border:1px solid #666;border-radius:12px;padding:4px 0;font-size:12px;font-weight:600;cursor:pointer;flex-shrink:0;width:44px;text-align:center;">CPY</button>
       </div>
 
       <div id="status-msg">Waiting…</div>
@@ -902,6 +903,26 @@
       btn.style.color = debugMode ? '#000' : '#fff';
       btn.style.borderColor = debugMode ? '#ff0' : '#666';
       if (S.lat !== null) renderDashboard();
+    });
+
+    // ── Copy road topology to clipboard ────────────────────────────────────────
+    document.getElementById('copy-roads-btn').addEventListener('click', () => {
+      const features = window.__lastFeatures;
+      const btn = document.getElementById('copy-roads-btn');
+      if (!features || features.length === 0) {
+        btn.textContent = '—';
+        setTimeout(() => { btn.textContent = 'CPY'; }, 1000);
+        return;
+      }
+      navigator.clipboard.writeText(JSON.stringify(features, null, 2))
+        .then(() => {
+          btn.textContent = '✓';
+          setTimeout(() => { btn.textContent = 'CPY'; }, 1500);
+        })
+        .catch(() => {
+          btn.textContent = '✗';
+          setTimeout(() => { btn.textContent = 'CPY'; }, 1500);
+        });
     });
 
     // ── Start button ───────────────────────────────────────────────────────────
