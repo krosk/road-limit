@@ -339,6 +339,47 @@ test('firstTurnAhead: junction (2 forward segments) → null', () => {
   assert.strictEqual(result, null);
 });
 
+test('firstTurnAhead: short feature-boundary stub does not create spurious junction', () => {
+  // Two features share a node. The car is matched to feature A between nodes 1 and 2
+  // (heading south → forward=false → segIdx=1). The BFS walk gives only [node1, node0]
+  // = 2 pts, ~24 m going SSW (204°). Feature B starts at node1 and continues south
+  // for 7 pts (~165°), ending in a right turn. Without the min-length guard the stub
+  // creates a second direction group (39° apart from longCont) → junction. With the
+  // guard (stub <30 m cannot create a group) the stub joins B's group within the
+  // wider 45° tolerance, leaving 1 direction group → turn card shown.
+  const shortStub = {
+    type: 'Feature',
+    geometry: { type: 'LineString', coordinates: [
+      [2.0001, 48.0000],  // node 0 — south endpoint
+      [2.0002, 48.0002],  // node 1 — junction with longContinuation
+      [2.0003, 48.0004],  // node 2 — car is between node1 and node2
+      [2.0004, 48.0006],  // node 3 — north end
+    ]},
+    properties: {},
+  };
+  const longContinuation = {
+    type: 'Feature',
+    geometry: { type: 'LineString', coordinates: [
+      [2.0002, 48.0002],  // node 0 — shared with shortStub node 1
+      [2.0001, 47.9999],  // going SSW
+      [2.0001, 47.9996],
+      [2.0001, 47.9993],
+      [2.0001, 47.9990],
+      [2.0004, 47.9990],  // right turn going east
+      [2.0007, 47.9990],
+    ]},
+    properties: {},
+  };
+  // Car exactly on shortStub segment [node1→node2], heading south (180°).
+  // Segment bears NNE so forward=false, segIdx=1.
+  // Walk backward: [node1, node0] = 2 pts, ~23 m — cannot create a direction group.
+  // longCont 7-pt walk has net bearing ~165° and length >30 m — creates the group.
+  // 23 m stub (204°) joins that group within the 45° tolerance (angDiff=39°).
+  // 1 group → turn detection runs on longCont's pts → right turn is detected.
+  const result = firstTurnAhead([shortStub, longContinuation], 2.00025, 48.0003, 180, 500, MAX_R, A, 50);
+  assert.ok(result !== null, 'short stub should join the longer segment\'s group, not create a spurious junction');
+});
+
 test('firstTurnAhead: backward BFS branch does not suppress turn card', () => {
   // A road heading south then turning right (west), with a branch heading north from
   // the junction. The north branch is 180° from the car's heading (180°) — a "backward"
