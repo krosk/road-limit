@@ -869,6 +869,7 @@
         timestamp:   new Date().toISOString(),
         position:    { lon: S.lon, lat: S.lat, heading: S.heading, accuracy: S.accuracy },
         speed:       kmh,
+        map:         map ? { zoom: map.getZoom(), pitch: map.getPitch(), bearing: map.getBearing() } : null,
         cfg:         { lookahead: CFG.lookahead, roadMatchMaxDist: CFG.roadMatchMaxDist, aThreshold: CFG.aThreshold },
         match:       match ? { dist: Math.round(match.dist), road: match.feature.properties?.name ?? match.feature.properties?.ref ?? null, class: match.feature.properties?.class ?? null } : null,
         segments:    { forward: forward.length, behind: segments.filter(s => s.isBehind).length },
@@ -1001,6 +1002,18 @@
             S.speed = (meta.speed ?? 0) / 3.6;
             setPosInputs(S.lon, S.lat, S.heading);
             updateCarPosition(S.lon, S.lat);
+            if (map && meta.map) {
+              map.jumpTo({
+                center:  [S.lon, S.lat],
+                zoom:    meta.map.zoom,
+                pitch:   meta.map.pitch,
+                bearing: meta.map.bearing,
+              });
+            }
+            if (meta.cfg) {
+              if (meta.cfg.lookahead    != null) { CFG.lookahead        = meta.cfg.lookahead;        document.getElementById('lookahead-dist').value = meta.cfg.lookahead; }
+              if (meta.cfg.roadMatchMaxDist != null) { CFG.roadMatchMaxDist = meta.cfg.roadMatchMaxDist; document.getElementById('match-dist').value    = meta.cfg.roadMatchMaxDist; }
+            }
           }
 
           renderDashboard();
