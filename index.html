@@ -850,7 +850,16 @@
         turnCardEl.style.display = 'none';
       }
 
-      setStatus(statusText(features, segments, match, S.accuracy));
+      // Diagnose why no turn card is shown
+      let turnReason = null;
+      if (card === null) {
+        const forward = segments.filter(s => !s.isBehind);
+        if (forward.length === 0)      turnReason = 'no match';
+        else if (forward.length > 1)   turnReason = 'junction';
+        else                           turnReason = 'straight';
+      }
+
+      setStatus(statusText(features, segments, match, S.accuracy, turnReason));
     }
 
     function renderGMeters() {

@@ -137,6 +137,16 @@ describe('statusText', () => {
     const text = statusText([], [], null, null);
     assert.ok(text.includes('±0 m'), text);
   });
+
+  test('turnReason appended when provided', () => {
+    const text = statusText([], [], null, 10, 'junction');
+    assert.ok(text.includes('turn: junction'), text);
+  });
+
+  test('no turnReason suffix when null', () => {
+    const text = statusText([], [], null, 10, null);
+    assert.ok(!text.includes('turn:'), text);
+  });
 });
 
 // ── barState ──────────────────────────────────────────────────────────────────
