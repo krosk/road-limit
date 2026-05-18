@@ -272,6 +272,34 @@ test('segmentsAhead: lookBehind > 0 → includes segment behind car', () => {
   assert.strictEqual(segsWithLookBehind.length, 2, `With lookBehind expected 2, got ${segsWithLookBehind.length}`);
 });
 
+test('segmentsAhead: backward BFS junction branch filtered when heading provided', () => {
+  // Car heading north (0°) at (2.0, 48.0).
+  // roadA goes north — BFS collects it forward.
+  // roadB shares roadA's ahead node and goes south — net bearing ≈ 180°,
+  //   which is >90° from heading → must be filtered from the overlay.
+  const lon = 2.0, lat = 48.0;
+  const roadA = {
+    type: 'Feature',
+    geometry: { type: 'LineString', coordinates: [
+      [2.0, 47.999], [2.0, 48.0], [2.0, 48.001], [2.0, 48.002],
+    ]},
+    properties: {},
+  };
+  const roadB = {
+    type: 'Feature',
+    geometry: { type: 'LineString', coordinates: [
+      [2.0, 48.001], [2.0, 48.0005], [2.0, 47.999],
+    ]},
+    properties: {},
+  };
+  const segsWithHeading    = segmentsAhead([roadA, roadB], lon, lat, 0, 500);
+  const segsWithoutHeading = segmentsAhead([roadA, roadB], lon, lat, null, 500);
+  assert.strictEqual(segsWithHeading.length, 1,
+    `Expected 1 (backward branch filtered), got ${segsWithHeading.length}`);
+  assert.ok(segsWithoutHeading.length >= 2,
+    `Without heading filter expected ≥2, got ${segsWithoutHeading.length}`);
+});
+
 // ── firstTurnAhead ─────────────────────────────────────────────────────────────
 
 const A = 0.30 * 9.81;

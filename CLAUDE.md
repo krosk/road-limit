@@ -46,7 +46,7 @@ test/
   motion.test.js        unit tests for lib/motion.js
   state.test.js         unit tests for lib/state.js
   display.test.js       unit tests for lib/display.js
-                        133 unit tests total across all lib files
+                        136 unit tests total across all lib files
 e2e/
   dashboard.spec.js     Playwright: mocks GPS + road features
   fixtures/             JSON road-feature fixtures for replay testing
@@ -137,7 +137,11 @@ WebGL canvas. Consequences:
 - **segmentsAhead algorithm**: BFS over the connected road graph up to
   `CFG.lookahead` metres ahead only (lookBehind = 0). Starts from the
   matched road, explores both directions at every junction node, tracks
-  cumulative distance budget.
+  cumulative distance budget. After collecting each segment's pts,
+  discards any segment whose net bearing (pts[0]→pts[last]) is >90°
+  from heading — this removes the backward BFS branch (the road the driver
+  just came from) that BFS always generates by branching both ways at every
+  node, preventing it from appearing in the visual overlay.
 - **Turn detection (`detectAllTurns`)**: computes circumradius for every
   consecutive triplet of points. Uses a `nodeMinR` pass to propagate each
   triplet's radius to all three of its nodes, so a node flanked by two tight
