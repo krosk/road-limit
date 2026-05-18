@@ -478,6 +478,7 @@
       lat: null, lon: null, speed: 0, heading: null, lastHeading: 0, accuracy: null,
       smoothLat: 0, smoothLong: 0, latG: 0, longG: 0,
       beta: 0, gamma: 0,
+      smoothAbsHeading: null,
       prevLat: null, prevLon: null,
     };
 
@@ -915,14 +916,36 @@
         if (e.gamma !== null) S.gamma = e.gamma;
       });
 
+      let _lastCompassApply = 0;
       window.addEventListener('deviceorientationabsolute', (e) => {
         if (e.alpha == null) return;
+
+        // Circular EMA
+        if (S.smoothAbsHeading === null) {
+          S.smoothAbsHeading = e.alpha;
+        } else {
+          let diff = e.alpha - S.smoothAbsHeading;
+          if (diff > 180) diff -= 360;
+          if (diff < -180) diff += 360;
+          S.smoothAbsHeading = (S.smoothAbsHeading + 0.1 * diff + 360) % 360;
+        }
+
         const el = document.getElementById('map-bearing');
         if (el) {
           el.dataset.abs = Math.round(e.alpha);
           const b = ((map.getBearing() % 360) + 360) % 360;
           el.textContent = `↑ ${Math.round(b)}°  ·  ${el.dataset.abs}°`;
         }
+
+        // At low speed mirror what onPos does: update heading then rotate map
+        if (posMode !== 'gps' || (S.speed ?? 0) >= CFG.minSpeedForHeading) return;
+        if (S.lat === null) return;
+        const now = Date.now();
+        if (now - _lastCompassApply < 500) return;
+        _lastCompassApply = now;
+        S.heading = S.smoothAbsHeading;
+        S.lastHeading = S.smoothAbsHeading;
+        updateCarPosition(S.lon, S.lat);
       });
     }
 
