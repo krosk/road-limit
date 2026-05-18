@@ -161,39 +161,6 @@
     .g-bar.warn { background: #f90; }
     .g-bar.over { background: #e33; }
 
-    /* Turn warning */
-    #turn-warning {
-      display: none;
-      background: #3a2000;
-      border: 1px solid #f90;
-      border-radius: 10px;
-      padding: 10px 14px;
-      margin-top: 10px;
-      text-align: center;
-    }
-
-    #turn-warning.visible { display: block; }
-    #turn-warning.urgent { background: #3a0000; border-color: #e33; }
-
-    #turn-distance {
-      font-size: 13px;
-      color: #f90;
-      margin-bottom: 2px;
-    }
-
-    #turn-warning.urgent #turn-distance { color: #e33; }
-
-    #turn-label {
-      font-size: 11px;
-      color: #888;
-      margin-bottom: 4px;
-    }
-
-    #turn-speed {
-      font-size: 36px;
-      font-weight: 700;
-      line-height: 1;
-    }
 
     /* Status message */
     #status-msg {
@@ -445,12 +412,6 @@
     </div>
 
     <div id="panel-lower">
-      <div id="turn-warning">
-        <div id="turn-distance"></div>
-        <div id="turn-label">Max speed for next turn</div>
-        <div id="turn-speed"></div>
-      </div>
-
       <div class="slider-row">
         <span class="g-label">Threshold</span>
         <input type="range" id="threshold-slider" min="0.10" max="0.50" step="0.05" value="0.30">
@@ -484,7 +445,7 @@
 
   <script type="module">
     import { haversine, bearingTo, angleDiff, destPoint, circumradius } from './lib/geo.js';
-    import { matchRoad, collectAhead, detectTurn, detectAllTurns, corneringSpeed, segmentsAhead, isSingleRoadAhead, parseSpeed } from './lib/road.js';
+    import { matchRoad, collectAhead, detectTurn, detectAllTurns, corneringSpeed, segmentsAhead, parseSpeed } from './lib/road.js';
     import { gravityInDeviceFrame, removeGravity, phoneToWorldFrame, worldToCarFrame, applyEMA } from './lib/motion.js';
 
     // Show deployed timestamp from the file's Last-Modified header
@@ -998,27 +959,6 @@
         document.getElementById('corner-badge-dist').textContent = `in ${Math.round(nearestTurn.distance)} m`;
       } else {
         cornerBadge.style.display = 'none';
-      }
-
-      // Turn warning
-      const turnEl = document.getElementById('turn-warning');
-      if (isSingleRoadAhead(segments)) {
-        const seg = segments.find(s => !s.isBehind);
-        if (seg.turn) {
-          const limit = seg.speedLimit ?? corneringSpeed(seg.turn.radius, CFG.aThreshold);
-          const maxSpeed = limit ?? 0;
-          const dist = Math.round(seg.turn.distance);
-          const urgent = dist < CFG.urgentDist || (maxSpeed > 0 && kmh > maxSpeed);
-
-          document.getElementById('turn-distance').textContent = `in ${dist} m`;
-          document.getElementById('turn-speed').textContent = maxSpeed > 0 ? `${maxSpeed} km/h` : '—';
-          turnEl.classList.add('visible');
-          turnEl.classList.toggle('urgent', urgent);
-        } else {
-          turnEl.classList.remove('visible', 'urgent');
-        }
-      } else {
-        turnEl.classList.remove('visible', 'urgent');
       }
 
       // Status
