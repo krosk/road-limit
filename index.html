@@ -938,8 +938,8 @@
       }
       const text = JSON.stringify(features);
       const flash = (ok, err) => {
-        if (err) console.error('CPY failed:', err);
         btn.textContent = ok ? '✓' : '✗';
+        if (!ok && err) document.getElementById('status-msg').textContent = 'CPY: ' + (err.message || err);
         setTimeout(() => { btn.textContent = 'CPY'; }, 1500);
       };
       // On secure contexts prefer the Clipboard API — call it immediately so the
