@@ -28,7 +28,7 @@ lib/
   road.js               road matching, lookahead, turn detection, badge logic
   motion.js             accelerometer calibration (Option C rotation matrix)
 test/
-  geo.test.js           45 unit tests total across the three lib files
+  geo.test.js           47 unit tests total across the three lib files
   road.test.js
   motion.test.js
 e2e/
@@ -51,6 +51,11 @@ docs/adr/               architecture decision records
   `CFG.lookahead` metres. Starts from the matched road, explores both
   directions at every junction node, tracks cumulative distance budget.
   Also walks `CFG.lookahead` metres behind the car for overlay context.
+- **Turn detection (`detectAllTurns`)**: computes circumradius for every
+  consecutive triplet of points. Uses a `nodeMinR` pass to propagate each
+  triplet's radius to all three of its nodes, so a node flanked by two tight
+  triplets is flagged even if its own triplet has a large radius. The first
+  collected node (`pts[0]`) is always an endpoint and can never receive a badge.
 
 ## Configuration
 
@@ -67,6 +72,9 @@ All tunable constants are in `CFG` at the top of `index.html`:
 
 `aThreshold` should be tuned once the insurer's exact threshold is known.
 
+Both `roadMatchMaxDist` and `lookahead` are also exposed as number inputs in
+the bottom panel for live tuning without reloading.
+
 ## Test hooks (for Playwright and manual debugging)
 
 `index.html` exposes:
@@ -75,6 +83,16 @@ All tunable constants are in `CFG` at the top of `index.html`:
 - `window.__lastFeatures` — always holds the last result from
   `queryRenderedFeatures` (after MultiLineString normalisation). Copy from
   DevTools console to build test fixtures for a specific location.
+
+## Debug mode (DBG)
+
+The bottom panel has a **DBG** toggle. When active:
+- Each evaluated triplet (pts[i-1], pts[i], pts[i+1]) is drawn as a dashed
+  polyline: **yellow** = tight circumradius (badge generated), **gray** = loose.
+- Speed badges are shifted 40 m to the right of the road; a colored line
+  connects the original node to its badge (green = under limit, red = over).
+- A **cyan ▶ square** marks `pts[0]` of each forward BFS segment — the start
+  node that can never receive a badge.
 
 ## Manual position mode
 
@@ -99,3 +117,6 @@ In **GPS** mode the fields are read-only and show the live GPS position.
 - `queryRenderedFeatures` returns 0 features while tiles are still loading
   (e.g. immediately after a drag in SET mode). The `idle` event triggers a
   re-render once tiles settle.
+- The first collected node of each BFS segment (`pts[0]`) is excluded from
+  turn detection; no badge appears there even if the geometry is curved.
+  In DBG mode a cyan ▶ marker identifies this node.
