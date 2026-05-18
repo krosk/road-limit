@@ -392,6 +392,7 @@
       <span id="speed-value">0</span><span id="speed-unit">km/h</span>
     </div>
     <div id="road-name"></div>
+    <div id="map-bearing" style="font-size:11px;color:#666;margin-top:3px;">↑ 0°</div>
   </div>
 
   <!-- Bottom panel: G meters + turn warning + status -->
@@ -622,6 +623,13 @@
           layout: { 'line-cap': 'round', 'line-join': 'round' },
         });
       });
+
+      const updateMapBearing = () => {
+        const b = ((map.getBearing() % 360) + 360) % 360;
+        document.getElementById('map-bearing').textContent = `↑ ${Math.round(b)}°`;
+      };
+      map.on('rotate', updateMapBearing);
+      map.on('load', updateMapBearing);
 
       // Blue car dot marker
       const dotEl = document.createElement('div');
@@ -1020,6 +1028,7 @@
       const show = panelExpanded ? '' : 'none';
       document.getElementById('panel-lower').style.display = show;
       document.getElementById('road-name').style.display = show;
+      document.getElementById('map-bearing').style.display = show;
       document.getElementById('panel-toggle-btn').textContent = panelExpanded ? '⌄' : '⌃';
     });
 
