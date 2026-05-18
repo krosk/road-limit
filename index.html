@@ -927,7 +927,7 @@
       if (S.lat !== null) renderDashboard();
     });
 
-    // ── Copy road topology to clipboard ────────────────────────────────────────
+    // ── Download road topology as JSON file ────────────────────────────────────
     document.getElementById('copy-roads-btn').addEventListener('click', () => {
       const features = window.__lastFeatures;
       const btn = document.getElementById('copy-roads-btn');
@@ -937,41 +937,21 @@
         return;
       }
       const text = JSON.stringify(features);
-      const flash = (ok, err) => {
-        btn.textContent = ok ? '✓' : '✗';
-        if (!ok && err) cpyExecCommand(err.message || String(err), () => {});
-        setTimeout(() => { btn.textContent = 'CPY'; }, 1500);
-      };
-      // On secure contexts prefer the Clipboard API — call it immediately so the
-      // user-gesture activation is still live. Fall back to execCommand otherwise.
-      if (navigator.clipboard?.writeText) {
-        navigator.clipboard.writeText(text)
-          .then(() => flash(true))
-          .catch((err) => {
-            console.warn('CPY: clipboard API failed, trying execCommand:', err);
-            cpyExecCommand(text, flash);
-          });
-      } else {
-        cpyExecCommand(text, flash);
-      }
+      const blob = new Blob([text], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'roads.json';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      btn.textContent = '✓';
+      setTimeout(() => { btn.textContent = 'CPY'; }, 1500);
     });
 
-    function cpyExecCommand(text, flash) {
-      const ta = document.createElement('textarea');
-      ta.value = text;
-      ta.setAttribute('readonly', '');
-      ta.style.cssText = 'position:fixed;opacity:0;top:0;left:0';
-      document.body.appendChild(ta);
-      ta.focus();
-      ta.select();
-      ta.setSelectionRange(0, text.length); // iOS requires this instead of select()
-      let ok = false;
-      try { ok = document.execCommand('copy'); } catch (e) { flash(false, e); return; }
-      document.body.removeChild(ta);
-      flash(ok, ok ? null : new Error('execCommand returned false'));
-    }
 
-    // ── Start button ───────────────────────────────────────────────────────────
+// ── Start button ───────────────────────────────────────────────────────────
     document.getElementById('start-btn').addEventListener('click', async () => {
       // iOS DeviceMotion permission
       if (typeof DeviceMotionEvent !== 'undefined' &&
