@@ -339,6 +339,31 @@ test('firstTurnAhead: junction (2 forward segments) → null', () => {
   assert.strictEqual(result, null);
 });
 
+test('firstTurnAhead: backward BFS branch does not suppress turn card', () => {
+  // A road heading south then turning right (west), with a branch heading north from
+  // the junction. The north branch is 180° from the car's heading (180°) — a "backward"
+  // BFS branch produced because BFS always explores both directions at junction nodes.
+  // With the heading filter (>90° from heading filtered out), the north branch is
+  // discarded and the turn card is shown.
+  const southToWestRoad = {
+    type: 'Feature',
+    geometry: { type: 'LineString', coordinates: [
+      [2.0, 48.002], [2.0, 48.001], [2.0, 48.0], [1.999, 48.0],
+    ]},
+    properties: {},
+  };
+  const northBranch = {
+    type: 'Feature',
+    geometry: { type: 'LineString', coordinates: [
+      [2.0, 48.001], [2.0, 48.003],
+    ]},
+    properties: {},
+  };
+  const result = firstTurnAhead([southToWestRoad, northBranch], 2.0, 48.002, 180, 500, MAX_R, A, 50);
+  assert.ok(result !== null, 'northward branch (>90° from heading) should be filtered; turn card must show');
+  assert.strictEqual(result.direction, 'right');
+});
+
 test('firstTurnAhead: distanceToStart > 0 for non-immediate turn', () => {
   const result = firstTurnAhead([leftTurnFeature], 2.0, 48.0, 90, 500, MAX_R, A, 50);
   assert.ok(result !== null);
