@@ -17,6 +17,46 @@
       position: relative;
     }
 
+    /* Nearest-turn badge: fixed top-right */
+    #corner-badge {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      z-index: 10;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+    }
+
+    #corner-badge-speed {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      background: #fff;
+      border: 5px solid #e33;
+      color: #000;
+      font-size: 30px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-variant-numeric: tabular-nums;
+    }
+
+    #corner-badge-speed.over {
+      background: #e33;
+      color: #fff;
+    }
+
+    #corner-badge-dist {
+      font-size: 12px;
+      color: #fff;
+      background: rgba(17, 17, 17, 0.75);
+      padding: 2px 8px;
+      border-radius: 6px;
+    }
+
     /* Map: full screen */
     #map {
       position: absolute;
@@ -359,6 +399,12 @@
 
   <!-- Map (full screen) -->
   <div id="map"></div>
+
+  <!-- Nearest-turn badge -->
+  <div id="corner-badge">
+    <div id="corner-badge-speed">—</div>
+    <div id="corner-badge-dist"></div>
+  </div>
 
   <!-- Speed overlay -->
   <div id="speed-overlay">
@@ -902,6 +948,29 @@
       updateBadges(segments, kmh);
       updateSegmentOverlay(segments, kmh);
       updateDebugTriplets(segments, maxTurnRadius);
+
+      // Nearest-turn badge (always visible when a turn is ahead)
+      let nearestTurn = null;
+      let nearestLimit = null;
+      for (const seg of segments) {
+        if (seg.isBehind) continue;
+        for (const turn of (seg.turns ?? [])) {
+          if (nearestTurn === null || turn.distance < nearestTurn.distance) {
+            nearestTurn = turn;
+            nearestLimit = corneringSpeed(turn.radius, CFG.aThreshold);
+          }
+        }
+      }
+      const cornerBadge = document.getElementById('corner-badge');
+      if (nearestTurn !== null && nearestLimit !== null) {
+        cornerBadge.style.display = 'flex';
+        const speedEl = document.getElementById('corner-badge-speed');
+        speedEl.textContent = String(nearestLimit);
+        speedEl.classList.toggle('over', kmh > nearestLimit);
+        document.getElementById('corner-badge-dist').textContent = `in ${Math.round(nearestTurn.distance)} m`;
+      } else {
+        cornerBadge.style.display = 'none';
+      }
 
       // Turn warning
       const turnEl = document.getElementById('turn-warning');
