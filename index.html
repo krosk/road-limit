@@ -476,10 +476,10 @@
         <span style="font-size:11px;color:#888;">lookahead</span>
         <button id="dbg-toggle" style="background:transparent;color:#fff;border:1px solid #666;border-radius:12px;padding:4px 0;font-size:12px;font-weight:600;cursor:pointer;flex-shrink:0;width:44px;text-align:center;margin-left:auto;">DBG</button>
       </div>
-    </div>
 
-    <div id="status-msg">Waiting…</div>
-    <div id="version-msg" style="font-size:10px;color:#fff;margin-top:2px;text-align:right;"></div>
+      <div id="status-msg">Waiting…</div>
+      <div id="version-msg" style="font-size:10px;color:#fff;margin-top:2px;text-align:right;"></div>
+    </div>
   </div>
 
   <script type="module">
@@ -1068,7 +1068,9 @@
     let panelExpanded = true;
     document.getElementById('panel-toggle-btn').addEventListener('click', () => {
       panelExpanded = !panelExpanded;
-      document.getElementById('panel-lower').style.display = panelExpanded ? '' : 'none';
+      const show = panelExpanded ? '' : 'none';
+      document.getElementById('panel-lower').style.display = show;
+      document.getElementById('road-name').style.display = show;
       document.getElementById('panel-toggle-btn').textContent = panelExpanded ? '⌄' : '⌃';
     });
 
