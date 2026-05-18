@@ -52,48 +52,51 @@ test('speed display shows GPS speed', async ({ page }) => {
   await expect(page.locator('#speed-value')).toHaveText('90', { timeout: 5000 });
 });
 
-test('turn warning hidden with no road features', async ({ page }) => {
+test('corner badge hidden with no road features', async ({ page }) => {
   await mockFeatures(page, []);
   await mockGPS(page, { latitude: 48.853, longitude: 2.348, speed: 10, heading: 90, accuracy: 10 });
   await page.goto('/');
   await page.locator('#start-btn').click();
   await page.waitForTimeout(1000);
-  await expect(page.locator('#turn-warning')).not.toBeVisible();
+  await expect(page.locator('#corner-badge')).not.toBeVisible();
 });
 
-test('turn warning shown for single road with 90° turn', async ({ page }) => {
-  // Car at 2.347, just west of the turn at 2.350 — gives 3 pts ahead so turn is detectable
+test('corner badge shown for single road with 90° turn', async ({ page }) => {
+  // Nodes spaced ~73 m apart (lon) and ~44 m (lat) so the 90° turn falls within 120 m lookahead.
   const features = [{
     type: 'Feature',
     geometry: {
       type: 'LineString',
       coordinates: [
-        [2.346, 48.853],
+        [2.345, 48.853],
+        [2.347, 48.853],
         [2.348, 48.853],
-        [2.350, 48.853],
-        [2.350, 48.855],
+        [2.348, 48.8534],
       ],
     },
     properties: {},
   }];
   await mockFeatures(page, features);
-  await mockGPS(page, { latitude: 48.853, longitude: 2.347, speed: 10, heading: 90, accuracy: 10 });
+  await mockGPS(page, { latitude: 48.853, longitude: 2.346, speed: 10, heading: 90, accuracy: 10 });
   await page.goto('/');
   await page.locator('#start-btn').click();
-  await expect(page.locator('#turn-warning')).toBeVisible({ timeout: 3000 });
+  await expect(page.locator('#corner-badge')).toBeVisible({ timeout: 3000 });
+  await expect(page.locator('#corner-badge-speed')).toHaveText(/\d+/);
 });
 
-test('turn warning suppressed at junction', async ({ page }) => {
-  // Two LineStrings near current position → junction → suppress warning
+test('corner badge shown at junction with sharp turn', async ({ page }) => {
+  // First road has a 90° bend within 120 m lookahead; second is a straight branch.
+  // Junction no longer suppresses the badge — nearest turn is still reported.
   const features = [
     {
       type: 'Feature',
       geometry: {
         type: 'LineString',
         coordinates: [
+          [2.345, 48.853],
+          [2.347, 48.853],
           [2.348, 48.853],
-          [2.350, 48.853],
-          [2.350, 48.855],
+          [2.348, 48.8534],
         ],
       },
       properties: {},
@@ -103,48 +106,47 @@ test('turn warning suppressed at junction', async ({ page }) => {
       geometry: {
         type: 'LineString',
         coordinates: [
-          [2.348, 48.853],
-          [2.348, 48.855],
-          [2.348, 48.857],
+          [2.347, 48.853],
+          [2.347, 48.855],
+          [2.347, 48.857],
         ],
       },
       properties: {},
     },
   ];
   await mockFeatures(page, features);
-  await mockGPS(page, { latitude: 48.853, longitude: 2.348, speed: 10, heading: 90, accuracy: 10 });
+  await mockGPS(page, { latitude: 48.853, longitude: 2.346, speed: 10, heading: 90, accuracy: 10 });
   await page.goto('/');
   await page.locator('#start-btn').click();
-  await page.waitForTimeout(2000);
-  await expect(page.locator('#turn-warning')).not.toBeVisible();
+  await expect(page.locator('#corner-badge')).toBeVisible({ timeout: 3000 });
 });
 
 // ── fixture-based tests ───────────────────────────────────────────────────────
 
-test('fixture: straight-road — road matched, no turn warning', async ({ page }) => {
+test('fixture: straight-road — road matched, no corner badge', async ({ page }) => {
   const features = loadFixture('straight-road-synthetic');
   // Car at west end of the straight road, heading east (90°)
   await mockFeatures(page, features);
   await mockGPS(page, { latitude: 48.853, longitude: 2.346, speed: 10, heading: 90, accuracy: 10 });
   await page.goto('/');
   await page.locator('#start-btn').click();
-  // Straight road → no turn detected → turn warning must not fire
+  // Straight road → no turn detected → corner badge must not appear
   await page.waitForTimeout(1500);
-  await expect(page.locator('#turn-warning')).not.toBeVisible();
+  await expect(page.locator('#corner-badge')).not.toBeVisible();
   // Road is matched → status shows road count, not "no road"
   await expect(page.locator('#status-msg')).toContainText('roads', { timeout: 3000 });
 });
 
-test('fixture: junction-synthetic — turn warning suppressed at junction', async ({ page }) => {
+test('fixture: junction-synthetic — straight roads at junction, no corner badge', async ({ page }) => {
   const features = loadFixture('junction-synthetic');
-  // Car on the E-W road, heading east — BFS will find both E-W and N-S branches
+  // Car on the E-W road, heading east — BFS finds both straight branches
   await mockFeatures(page, features);
   await mockGPS(page, { latitude: 48.853, longitude: 2.348, speed: 10, heading: 90, accuracy: 10 });
   await page.goto('/');
   await page.locator('#start-btn').click();
   await page.waitForTimeout(1500);
-  // Two road branches ahead → isSingleRoadAhead false → turn warning suppressed
-  await expect(page.locator('#turn-warning')).not.toBeVisible();
+  // Both roads are straight — no tight circumradius → corner badge stays hidden
+  await expect(page.locator('#corner-badge')).not.toBeVisible();
   // Status shows at least 2 features
   await expect(page.locator('#status-msg')).toContainText('roads', { timeout: 3000 });
 });
