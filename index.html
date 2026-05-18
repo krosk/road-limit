@@ -941,24 +941,25 @@
         btn.textContent = ok ? '✓' : '✗';
         setTimeout(() => { btn.textContent = 'CPY'; }, 1500);
       };
-      if (navigator.clipboard?.writeText) {
-        navigator.clipboard.writeText(text).then(() => flash(true)).catch(() => execCopy(text, flash));
-      } else {
-        execCopy(text, flash);
-      }
-    });
-
-    function execCopy(text, flash) {
+      // execCommand must run synchronously inside the gesture handler; try it first.
+      // Fall back to the async clipboard API only if execCommand is unsupported.
       const ta = document.createElement('textarea');
       ta.value = text;
       ta.style.cssText = 'position:fixed;opacity:0;top:0;left:0';
       document.body.appendChild(ta);
       ta.focus();
       ta.select();
-      try { flash(document.execCommand('copy')); }
-      catch { flash(false); }
+      let ok = false;
+      try { ok = document.execCommand('copy'); } catch {}
       document.body.removeChild(ta);
-    }
+      if (ok) {
+        flash(true);
+      } else if (navigator.clipboard?.writeText) {
+        navigator.clipboard.writeText(text).then(() => flash(true)).catch(() => flash(false));
+      } else {
+        flash(false);
+      }
+    });
 
     // ── Start button ───────────────────────────────────────────────────────────
     document.getElementById('start-btn').addEventListener('click', async () => {
