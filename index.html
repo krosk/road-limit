@@ -395,6 +395,7 @@
       <input type="number" id="lookahead-dist" value="60" min="10" max="2000" step="10"
              style="width:72px;background:#1a1a1a;border:1px solid #333;border-radius:6px;color:#fff;font-size:12px;padding:4px 6px;outline:none;margin-left:12px;">
       <span style="font-size:11px;color:#888;">lookahead</span>
+      <button id="dbg-toggle" style="background:transparent;color:#fff;border:1px solid #666;border-radius:12px;padding:4px 0;font-size:12px;font-weight:600;cursor:pointer;flex-shrink:0;width:44px;text-align:center;margin-left:auto;">DBG</button>
     </div>
 
     <div id="status-msg">Waiting…</div>
@@ -402,7 +403,7 @@
   </div>
 
   <script type="module">
-    import { haversine, bearingTo, angleDiff, destPoint } from './lib/geo.js';
+    import { haversine, bearingTo, angleDiff, destPoint, circumradius } from './lib/geo.js';
     import { matchRoad, collectAhead, detectTurn, detectAllTurns, corneringSpeed, segmentsAhead, isSingleRoadAhead, parseSpeed } from './lib/road.js';
     import { gravityInDeviceFrame, removeGravity, phoneToWorldFrame, worldToCarFrame, applyEMA } from './lib/motion.js';
 
@@ -437,6 +438,9 @@
       beta: 0, gamma: 0,
       prevLat: null, prevLon: null,
     };
+
+    // ── Debug state ───────────────────────────────────────────────────────────
+    let debugMode = false;
 
     // ── Mock features hook (Playwright / testing) ──────────────────────────────
     let _mockFeatures = null;
@@ -543,6 +547,23 @@
           },
           layout: { 'line-cap': 'round', 'line-join': 'round' },
         });
+
+        map.addSource('debug-triplets', {
+          type: 'geojson',
+          data: { type: 'FeatureCollection', features: [] },
+        });
+        map.addLayer({
+          id: 'debug-triplets-line',
+          type: 'line',
+          source: 'debug-triplets',
+          paint: {
+            'line-color': ['get', 'color'],
+            'line-width': 3,
+            'line-opacity': 0.95,
+            'line-dasharray': [5, 3],
+          },
+          layout: { 'line-cap': 'round', 'line-join': 'round' },
+        });
       });
 
       // Blue car dot marker
@@ -639,6 +660,28 @@
         };
       });
       map.getSource('segments-ahead').setData({ type: 'FeatureCollection', features });
+    }
+
+    function updateDebugTriplets(segments, maxTurnRadius) {
+      if (!map || !map.getSource('debug-triplets')) return;
+      if (!debugMode) {
+        map.getSource('debug-triplets').setData({ type: 'FeatureCollection', features: [] });
+        return;
+      }
+      const features = [];
+      for (const seg of segments) {
+        if (seg.isBehind) continue;
+        const pts = seg.pts;
+        for (let i = 1; i < pts.length - 1; i++) {
+          const r = circumradius(pts[i - 1], pts[i], pts[i + 1]);
+          features.push({
+            type: 'Feature',
+            geometry: { type: 'LineString', coordinates: [pts[i - 1], pts[i], pts[i + 1]] },
+            properties: { color: r <= maxTurnRadius ? '#ff0' : '#555' },
+          });
+        }
+      }
+      map.getSource('debug-triplets').setData({ type: 'FeatureCollection', features });
     }
 
     // ── GPS ────────────────────────────────────────────────────────────────────
@@ -778,6 +821,7 @@
       // Update map overlays
       updateBadges(segments, kmh);
       updateSegmentOverlay(segments, kmh);
+      updateDebugTriplets(segments, maxTurnRadius);
 
       // Turn warning
       const turnEl = document.getElementById('turn-warning');
@@ -851,6 +895,16 @@
         CFG.lookahead = v;
         if (S.lat !== null) renderDashboard();
       }
+    });
+
+    // ── Debug toggle ───────────────────────────────────────────────────────────
+    document.getElementById('dbg-toggle').addEventListener('click', () => {
+      debugMode = !debugMode;
+      const btn = document.getElementById('dbg-toggle');
+      btn.style.background = debugMode ? '#ff0' : 'transparent';
+      btn.style.color = debugMode ? '#000' : '#fff';
+      btn.style.borderColor = debugMode ? '#ff0' : '#666';
+      if (S.lat !== null) renderDashboard();
     });
 
     // ── Start button ───────────────────────────────────────────────────────────
