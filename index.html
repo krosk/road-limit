@@ -392,6 +392,9 @@
       <input type="number" id="match-dist" value="100" min="10" max="500" step="10"
              style="width:72px;background:#1a1a1a;border:1px solid #333;border-radius:6px;color:#fff;font-size:12px;padding:4px 6px;outline:none;">
       <span style="font-size:11px;color:#888;">road match</span>
+      <input type="number" id="lookahead-dist" value="500" min="100" max="2000" step="100"
+             style="width:72px;background:#1a1a1a;border:1px solid #333;border-radius:6px;color:#fff;font-size:12px;padding:4px 6px;outline:none;margin-left:12px;">
+      <span style="font-size:11px;color:#888;">lookahead</span>
     </div>
 
     <div id="status-msg">Waiting…</div>
@@ -816,6 +819,14 @@
       const v = parseFloat(e.target.value);
       if (isFinite(v) && v > 0) {
         CFG.roadMatchMaxDist = v;
+        if (S.lat !== null) renderDashboard();
+      }
+    });
+
+    document.getElementById('lookahead-dist').addEventListener('input', (e) => {
+      const v = parseFloat(e.target.value);
+      if (isFinite(v) && v > 0) {
+        CFG.lookahead = v;
         if (S.lat !== null) renderDashboard();
       }
     });
