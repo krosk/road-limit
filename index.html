@@ -306,6 +306,23 @@
 
     #pos-apply:disabled { opacity: 0.3; cursor: default; }
 
+    /* Panel collapse toggle */
+    #panel-toggle-row {
+      display: flex;
+      justify-content: center;
+      margin: 6px 0 2px;
+    }
+
+    #panel-toggle-btn {
+      background: transparent;
+      border: none;
+      color: #444;
+      font-size: 18px;
+      line-height: 1;
+      cursor: pointer;
+      padding: 0 24px;
+    }
+
     /* Debug: BFS start-node marker */
     .debug-start-node {
       width: 22px;
@@ -423,36 +440,42 @@
       <span class="g-val" id="long-val">0.00g</span>
     </div>
 
-    <div id="turn-warning">
-      <div id="turn-distance"></div>
-      <div id="turn-label">Max speed for next turn</div>
-      <div id="turn-speed"></div>
+    <div id="panel-toggle-row">
+      <button id="panel-toggle-btn">⌄</button>
     </div>
 
-    <div class="slider-row">
-      <span class="g-label">Threshold</span>
-      <input type="range" id="threshold-slider" min="0.10" max="0.50" step="0.05" value="0.30">
-      <span id="threshold-val">0.30 g</span>
-    </div>
-
-    <div class="pos-row">
-      <button id="pos-toggle">GPS</button>
-      <div id="pos-inputs">
-        <input type="number" id="pos-lon" placeholder="Lon" step="0.0001" readonly>
-        <input type="number" id="pos-lat" placeholder="Lat" step="0.0001" readonly>
-        <input type="number" id="pos-hdg" placeholder="Hdg°" min="0" max="359" step="1" readonly>
-        <button id="pos-apply" disabled>Apply</button>
+    <div id="panel-lower">
+      <div id="turn-warning">
+        <div id="turn-distance"></div>
+        <div id="turn-label">Max speed for next turn</div>
+        <div id="turn-speed"></div>
       </div>
-    </div>
-    <div class="pos-row" style="margin-top:6px;padding-top:6px;">
-      <span style="font-size:11px;color:#888;flex-shrink:0;width:44px;">Dist m</span>
-      <input type="number" id="match-dist" value="30" min="10" max="500" step="10"
-             style="width:72px;background:#1a1a1a;border:1px solid #333;border-radius:6px;color:#fff;font-size:12px;padding:4px 6px;outline:none;">
-      <span style="font-size:11px;color:#888;">road match</span>
-      <input type="number" id="lookahead-dist" value="120" min="10" max="2000" step="10"
-             style="width:72px;background:#1a1a1a;border:1px solid #333;border-radius:6px;color:#fff;font-size:12px;padding:4px 6px;outline:none;margin-left:12px;">
-      <span style="font-size:11px;color:#888;">lookahead</span>
-      <button id="dbg-toggle" style="background:transparent;color:#fff;border:1px solid #666;border-radius:12px;padding:4px 0;font-size:12px;font-weight:600;cursor:pointer;flex-shrink:0;width:44px;text-align:center;margin-left:auto;">DBG</button>
+
+      <div class="slider-row">
+        <span class="g-label">Threshold</span>
+        <input type="range" id="threshold-slider" min="0.10" max="0.50" step="0.05" value="0.30">
+        <span id="threshold-val">0.30 g</span>
+      </div>
+
+      <div class="pos-row">
+        <button id="pos-toggle">GPS</button>
+        <div id="pos-inputs">
+          <input type="number" id="pos-lon" placeholder="Lon" step="0.0001" readonly>
+          <input type="number" id="pos-lat" placeholder="Lat" step="0.0001" readonly>
+          <input type="number" id="pos-hdg" placeholder="Hdg°" min="0" max="359" step="1" readonly>
+          <button id="pos-apply" disabled>Apply</button>
+        </div>
+      </div>
+      <div class="pos-row" style="margin-top:6px;padding-top:6px;">
+        <span style="font-size:11px;color:#888;flex-shrink:0;width:44px;">Dist m</span>
+        <input type="number" id="match-dist" value="30" min="10" max="500" step="10"
+               style="width:72px;background:#1a1a1a;border:1px solid #333;border-radius:6px;color:#fff;font-size:12px;padding:4px 6px;outline:none;">
+        <span style="font-size:11px;color:#888;">road match</span>
+        <input type="number" id="lookahead-dist" value="120" min="10" max="2000" step="10"
+               style="width:72px;background:#1a1a1a;border:1px solid #333;border-radius:6px;color:#fff;font-size:12px;padding:4px 6px;outline:none;margin-left:12px;">
+        <span style="font-size:11px;color:#888;">lookahead</span>
+        <button id="dbg-toggle" style="background:transparent;color:#fff;border:1px solid #666;border-radius:12px;padding:4px 0;font-size:12px;font-weight:600;cursor:pointer;flex-shrink:0;width:44px;text-align:center;margin-left:auto;">DBG</button>
+      </div>
     </div>
 
     <div id="status-msg">Waiting…</div>
@@ -1039,6 +1062,14 @@
         CFG.lookahead = v;
         if (S.lat !== null) renderDashboard();
       }
+    });
+
+    // ── Panel collapse ────────────────────────────────────────────────────────
+    let panelExpanded = true;
+    document.getElementById('panel-toggle-btn').addEventListener('click', () => {
+      panelExpanded = !panelExpanded;
+      document.getElementById('panel-lower').style.display = panelExpanded ? '' : 'none';
+      document.getElementById('panel-toggle-btn').textContent = panelExpanded ? '⌄' : '⌃';
     });
 
     // ── Debug toggle ───────────────────────────────────────────────────────────
