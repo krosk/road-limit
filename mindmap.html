@@ -92,6 +92,51 @@ mindmap
         updateBadges
         updateSegmentOverlay
         updateDebugTriplets
+    External APIs
+      MapLibre GL JS
+        Map constructor
+          initMap
+        addSource · addLayer
+          initMap
+        on load · rotate · drag · idle
+          initMap
+        getBearing
+          initMap
+        getCenter
+          initMap drag handler
+        queryRenderedFeatures
+          getRoadFeatures
+        isStyleLoaded
+          getRoadFeatures
+        source.setData
+          updateSegmentOverlay
+          updateDebugTriplets
+          updateBadges
+        easeTo
+          updateCarPosition
+        Marker · setLngLat · addTo
+          initMap
+          updateBadges
+        marker.remove
+          updateBadges
+      Geolocation API
+        watchPosition
+          initGPS
+      Device Sensors
+        devicemotion event
+          initMotion
+        DeviceMotionEvent.requestPermission
+          initMotion
+        deviceorientation event
+          initMotion
+        deviceorientationabsolute event
+          initMotion
+      Fetch API
+        HEAD index.html
+          startup
+      OpenFreeMap CDN
+        liberty tile style
+          initMap
 </div>
 <script>mermaid.initialize({ theme: 'dark', startOnLoad: true });</script>
 </body>
