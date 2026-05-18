@@ -943,8 +943,8 @@
         const now = Date.now();
         if (now - _lastCompassApply < 500) return;
         _lastCompassApply = now;
-        S.heading = S.smoothAbsHeading;
-        S.lastHeading = S.smoothAbsHeading;
+        S.heading = (S.smoothAbsHeading + 180) % 360;
+        S.lastHeading = S.heading;
         updateCarPosition(S.lon, S.lat);
       });
     }
