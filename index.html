@@ -266,6 +266,22 @@
 
     #pos-apply:disabled { opacity: 0.3; cursor: default; }
 
+    /* Debug: BFS start-node marker */
+    .debug-start-node {
+      width: 22px;
+      height: 22px;
+      border-radius: 4px;
+      background: #0ff;
+      border: 2px solid #000;
+      color: #000;
+      font-size: 11px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: default;
+    }
+
     /* Speed badges on map */
     .speed-badge {
       width: 36px;
@@ -651,6 +667,18 @@
 
       for (const seg of segments) {
         if (seg.isBehind) continue;
+
+        if (debugMode) {
+          const startEl = document.createElement('div');
+          startEl.className = 'debug-start-node';
+          startEl.textContent = '▶';
+          badgeMarkers.push(
+            new window.maplibregl.Marker({ element: startEl })
+              .setLngLat(seg.pts[0])
+              .addTo(map)
+          );
+        }
+
         for (const turn of (seg.turns ?? [])) {
           const limit = corneringSpeed(turn.radius, CFG.aThreshold);
           if (limit === null) continue;
