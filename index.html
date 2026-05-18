@@ -446,6 +446,8 @@
         <span style="font-size:11px;color:#888;">lookahead</span>
         <button id="dbg-toggle" style="background:transparent;color:#fff;border:1px solid #666;border-radius:12px;padding:4px 0;font-size:12px;font-weight:600;cursor:pointer;flex-shrink:0;width:44px;text-align:center;margin-left:auto;">DBG</button>
         <button id="copy-roads-btn" style="background:transparent;color:#fff;border:1px solid #666;border-radius:12px;padding:4px 0;font-size:12px;font-weight:600;cursor:pointer;flex-shrink:0;width:44px;text-align:center;">CPY</button>
+        <input type="file" id="load-roads-input" accept=".json" style="display:none">
+        <button id="load-roads-btn" style="background:transparent;color:#fff;border:1px solid #666;border-radius:12px;padding:4px 0;font-size:12px;font-weight:600;cursor:pointer;flex-shrink:0;width:44px;text-align:center;">LDR</button>
       </div>
 
       <div id="status-msg">Waiting…</div>
@@ -965,8 +967,56 @@
       setTimeout(() => { btn.textContent = 'CPY'; }, 1500);
     });
 
+    // ── Load roads JSON fixture ────────────────────────────────────────────────
+    document.getElementById('load-roads-btn').addEventListener('click', () => {
+      document.getElementById('load-roads-input').click();
+    });
 
-// ── Start button ───────────────────────────────────────────────────────────
+    document.getElementById('load-roads-input').addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const btn = document.getElementById('load-roads-btn');
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        try {
+          const raw = JSON.parse(ev.target.result);
+          const features = Array.isArray(raw) ? raw : raw.features;
+          const meta     = Array.isArray(raw) ? null : raw.meta;
+          _mockFeatures  = features;
+          window.__lastFeatures = features;
+
+          // Switch to SET mode and apply position from meta if available
+          if (meta?.position?.lon != null) {
+            posMode = 'manual';
+            const toggle = document.getElementById('pos-toggle');
+            toggle.textContent = 'SET';
+            toggle.classList.add('active');
+            document.getElementById('pos-apply').disabled = false;
+            document.querySelectorAll('#pos-inputs input').forEach(i => i.removeAttribute('readonly'));
+            S.lon = meta.position.lon;
+            S.lat = meta.position.lat;
+            S.heading = meta.position.heading ?? S.heading;
+            S.lastHeading = S.heading;
+            S.accuracy = meta.position.accuracy ?? S.accuracy;
+            S.speed = (meta.speed ?? 0) / 3.6;
+            setPosInputs(S.lon, S.lat, S.heading);
+            updateCarPosition(S.lon, S.lat);
+          }
+
+          renderDashboard();
+          btn.textContent = '✓';
+          pinStatus(`Loaded ${features.length} features` + (meta?.commit ? ` @ ${meta.commit}` : ''), 4000);
+        } catch (err) {
+          btn.textContent = '✗';
+          pinStatus('LDR: ' + (err.message || err), 5000);
+        }
+        setTimeout(() => { btn.textContent = 'LDR'; }, 1500);
+        e.target.value = '';
+      };
+      reader.readAsText(file);
+    });
+
+    // ── Start button ───────────────────────────────────────────────────────────
     document.getElementById('start-btn').addEventListener('click', async () => {
       // iOS DeviceMotion permission
       if (typeof DeviceMotionEvent !== 'undefined' &&
