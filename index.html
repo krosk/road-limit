@@ -783,7 +783,9 @@
       // Status
       const roadCount = features.length;
       const distStr = match ? `${Math.round(match.dist)} m to road` : 'no road';
-      setStatus(`±${Math.round(S.accuracy ?? 0)} m · ${roadCount} roads [${roadLayers.length} layers] · ${distStr}`);
+      const aheadCount = segments.filter(s => !s.isBehind).length;
+      const behindCount = segments.filter(s => s.isBehind).length;
+      setStatus(`±${Math.round(S.accuracy ?? 0)} m · ${roadCount} roads · ${aheadCount}↑ ${behindCount}↓ edges · ${distStr}`);
     }
 
     function renderGMeters() {
