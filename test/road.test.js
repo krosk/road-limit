@@ -383,9 +383,10 @@ test('normaliseFeatures: MultiLineString expanded into separate LineStrings', ()
 });
 
 test('normaliseFeatures: expanded features inherit properties', () => {
+  const coords2 = [[2.002, 48], [2.003, 48]];
   const feat = {
     type: 'Feature',
-    geometry: { type: 'MultiLineString', coordinates: [coords, coords] },
+    geometry: { type: 'MultiLineString', coordinates: [coords, coords2] },
     properties: { maxspeed: '50' },
   };
   const result = normaliseFeatures([feat]);
@@ -399,8 +400,10 @@ test('normaliseFeatures: unknown geometry types ignored', () => {
 });
 
 test('normaliseFeatures: mixed input normalised correctly', () => {
+  const c2 = [[2.002, 48], [2.003, 48]];
+  const c3 = [[2.004, 48], [2.005, 48]];
   const line = { type: 'Feature', geometry: { type: 'LineString', coordinates: coords }, properties: {} };
-  const multi = { type: 'Feature', geometry: { type: 'MultiLineString', coordinates: [coords, coords] }, properties: {} };
+  const multi = { type: 'Feature', geometry: { type: 'MultiLineString', coordinates: [c2, c3] }, properties: {} };
   const result = normaliseFeatures([line, multi]);
   assert.equal(result.length, 3);
   assert.ok(result.every(f => f.geometry.type === 'LineString'));
