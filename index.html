@@ -393,6 +393,7 @@
     </div>
     <div id="road-name"></div>
     <div id="map-bearing" style="font-size:11px;color:#666;margin-top:3px;">↑ 0°</div>
+    <div id="compass-raw" style="font-size:11px;color:#666;margin-top:1px;">compass —</div>
   </div>
 
   <!-- Bottom panel: G meters + turn warning + status -->
@@ -911,6 +912,10 @@
       window.addEventListener('deviceorientation', (e) => {
         if (e.beta  !== null) S.beta  = e.beta;
         if (e.gamma !== null) S.gamma = e.gamma;
+        const webkit = e.webkitCompassHeading;
+        const alpha  = e.alpha;
+        const el = document.getElementById('compass-raw');
+        if (el) el.textContent = `wk ${webkit != null ? Math.round(webkit) : '—'}°  α ${alpha != null ? Math.round(alpha) : '—'}°`;
       });
     }
 
@@ -1029,6 +1034,7 @@
       document.getElementById('panel-lower').style.display = show;
       document.getElementById('road-name').style.display = show;
       document.getElementById('map-bearing').style.display = show;
+      document.getElementById('compass-raw').style.display = show;
       document.getElementById('panel-toggle-btn').textContent = panelExpanded ? '⌄' : '⌃';
     });
 
