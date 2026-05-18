@@ -393,7 +393,6 @@
     </div>
     <div id="road-name"></div>
     <div id="map-bearing" style="font-size:11px;color:#666;margin-top:3px;">↑ 0°</div>
-    <div id="compass-raw" style="font-size:11px;color:#666;margin-top:1px;">compass —</div>
   </div>
 
   <!-- Bottom panel: G meters + turn warning + status -->
@@ -627,7 +626,9 @@
 
       const updateMapBearing = () => {
         const b = ((map.getBearing() % 360) + 360) % 360;
-        document.getElementById('map-bearing').textContent = `↑ ${Math.round(b)}°`;
+        const el = document.getElementById('map-bearing');
+        const abs = el.dataset.abs ?? '—';
+        el.textContent = `↑ ${Math.round(b)}°  ·  ${abs}°`;
       };
       map.on('rotate', updateMapBearing);
       map.on('load', updateMapBearing);
@@ -912,21 +913,15 @@
       window.addEventListener('deviceorientation', (e) => {
         if (e.beta  !== null) S.beta  = e.beta;
         if (e.gamma !== null) S.gamma = e.gamma;
-        const webkit = e.webkitCompassHeading;
-        const alpha  = e.alpha;
-        const el = document.getElementById('compass-raw');
-        if (el) {
-          el.dataset.rel = alpha != null ? Math.round(alpha) : '—';
-          el.dataset.wk  = webkit != null ? Math.round(webkit) : '—';
-          el.textContent = `wk ${el.dataset.wk}°  α ${el.dataset.rel}°  abs ${el.dataset.abs ?? '—'}°`;
-        }
       });
 
       window.addEventListener('deviceorientationabsolute', (e) => {
-        const el = document.getElementById('compass-raw');
+        if (e.alpha == null) return;
+        const el = document.getElementById('map-bearing');
         if (el) {
-          el.dataset.abs = e.alpha != null ? Math.round(e.alpha) : '—';
-          el.textContent = `wk ${el.dataset.wk ?? '—'}°  α ${el.dataset.rel ?? '—'}°  abs ${el.dataset.abs}°`;
+          el.dataset.abs = Math.round(e.alpha);
+          const b = ((map.getBearing() % 360) + 360) % 360;
+          el.textContent = `↑ ${Math.round(b)}°  ·  ${el.dataset.abs}°`;
         }
       });
     }
@@ -1046,7 +1041,6 @@
       document.getElementById('panel-lower').style.display = show;
       document.getElementById('road-name').style.display = show;
       document.getElementById('map-bearing').style.display = show;
-      document.getElementById('compass-raw').style.display = show;
       document.getElementById('panel-toggle-btn').textContent = panelExpanded ? '⌄' : '⌃';
     });
 
