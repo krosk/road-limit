@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { haversine, bearingTo, angleDiff, circumradius, destPoint } from '../lib/geo.js';
+import { haversine, bearingTo, angleDiff, circumradius, destPoint, ptAtDistance, bearingAtDistance } from '../lib/geo.js';
 
 // ── haversine ────────────────────────────────────────────────────────────────
 
@@ -83,4 +83,50 @@ test('destPoint: go 1000m north, bearing back ≈ 180°', () => {
   const [lat2, lon2] = destPoint(48.0, 2.0, 0, 1000);
   const b = bearingTo(lat2, lon2, 48.0, 2.0);
   assert.ok(Math.abs(b - 180) < 1, `Expected ~180°, got ${b}`);
+});
+
+// ── ptAtDistance ──────────────────────────────────────────────────────────────
+
+// East-going polyline: each 0.001° lon ≈ 73 m at lat 48
+const eastPts = [[2.000, 48.000], [2.001, 48.000], [2.002, 48.000]];
+
+test('ptAtDistance: d=0 returns first point', () => {
+  const p = ptAtDistance(eastPts, 0);
+  assert.ok(Math.abs(p[0] - 2.000) < 0.0001);
+  assert.ok(Math.abs(p[1] - 48.000) < 0.0001);
+});
+
+test('ptAtDistance: d > length returns last point', () => {
+  const p = ptAtDistance(eastPts, 100000);
+  assert.ok(Math.abs(p[0] - 2.002) < 0.0001);
+});
+
+test('ptAtDistance: midpoint of first segment', () => {
+  const segLen = haversine(48.000, 2.000, 48.000, 2.001);
+  const p = ptAtDistance(eastPts, segLen / 2);
+  assert.ok(Math.abs(p[0] - 2.0005) < 0.0001, `expected lon ≈ 2.0005, got ${p[0]}`);
+});
+
+test('ptAtDistance: exactly at second node', () => {
+  const segLen = haversine(48.000, 2.000, 48.000, 2.001);
+  const p = ptAtDistance(eastPts, segLen);
+  assert.ok(Math.abs(p[0] - 2.001) < 0.0001);
+});
+
+// ── bearingAtDistance ─────────────────────────────────────────────────────────
+
+test('bearingAtDistance: eastward road returns ~90°', () => {
+  const b = bearingAtDistance(eastPts, 50);
+  assert.ok(Math.abs(b - 90) < 1, `expected ~90°, got ${b}`);
+});
+
+test('bearingAtDistance: northward road returns ~0°', () => {
+  const northPts = [[2.000, 48.000], [2.000, 48.001], [2.000, 48.002]];
+  const b = bearingAtDistance(northPts, 50);
+  assert.ok(b < 1 || b > 359, `expected ~0°, got ${b}`);
+});
+
+test('bearingAtDistance: d beyond length returns bearing of last segment', () => {
+  const b = bearingAtDistance(eastPts, 100000);
+  assert.ok(Math.abs(b - 90) < 1);
 });

@@ -445,9 +445,11 @@
   </div>
 
   <script type="module">
-    import { haversine, bearingTo, angleDiff, destPoint, circumradius } from './lib/geo.js';
-    import { matchRoad, collectAhead, detectTurn, detectAllTurns, corneringSpeed, segmentsAhead, parseSpeed } from './lib/road.js';
-    import { gravityInDeviceFrame, removeGravity, phoneToWorldFrame, worldToCarFrame, applyEMA } from './lib/motion.js';
+    import { haversine, bearingTo, destPoint, ptAtDistance, bearingAtDistance } from './lib/geo.js';
+    import { matchRoad, segmentsAhead } from './lib/road.js';
+    import { DEFAULT_CFG } from './lib/config.js';
+    import { createState, applyGPS, smoothCompass, applyMotion } from './lib/state.js';
+    import { computeCornerBadge, segmentsGeoJSON, statusText, barState, badgeItems, debugTripletFeatures } from './lib/display.js';
 
     // Show deployed timestamp from the file's Last-Modified header
     fetch('index.html', { method: 'HEAD' })
@@ -462,25 +464,10 @@
       .catch(() => {});
 
     // ── Config ─────────────────────────────────────────────────────────────────
-    const CFG = {
-      lateralGLimit:     0.30,
-      longGLimit:        0.40,
-      aThreshold:        0.30 * 9.81,
-      lookahead:         120,
-      smoothAlpha:       0.15,
-      urgentDist:        200,
-      minSpeedForHeading: 5 / 3.6,
-      roadMatchMaxDist:  30,
-    };
+    const CFG = { ...DEFAULT_CFG };
 
     // ── State ──────────────────────────────────────────────────────────────────
-    const S = {
-      lat: null, lon: null, speed: 0, heading: null, lastHeading: 0, accuracy: null,
-      smoothLat: 0, smoothLong: 0, latG: 0, longG: 0,
-      beta: 0, gamma: 0,
-      smoothAbsHeading: null,
-      prevLat: null, prevLon: null,
-    };
+    const S = createState();
 
     // ── Debug state ───────────────────────────────────────────────────────────
     let debugMode = false;
@@ -674,46 +661,15 @@
       map.easeTo({ center: [lon, lat], bearing: S.lastHeading, duration: 300 });
     }
 
-    // Interpolate [lon, lat] at cumulative distance d along a polyline.
-    function ptAtDistance(pts, d) {
-      let acc = 0;
-      for (let i = 1; i < pts.length; i++) {
-        const seg = haversine(pts[i - 1][1], pts[i - 1][0], pts[i][1], pts[i][0]);
-        if (acc + seg >= d) {
-          const t = seg > 0 ? (d - acc) / seg : 0;
-          return [
-            pts[i - 1][0] + t * (pts[i][0] - pts[i - 1][0]),
-            pts[i - 1][1] + t * (pts[i][1] - pts[i - 1][1]),
-          ];
-        }
-        acc += seg;
-      }
-      return pts[pts.length - 1];
-    }
-
-    // Road bearing (degrees) at cumulative distance d along a polyline.
-    function bearingAtDistance(pts, d) {
-      let acc = 0;
-      for (let i = 1; i < pts.length; i++) {
-        const seg = haversine(pts[i - 1][1], pts[i - 1][0], pts[i][1], pts[i][0]);
-        if (acc + seg >= d || i === pts.length - 1) {
-          return bearingTo(pts[i - 1][1], pts[i - 1][0], pts[i][1], pts[i][0]);
-        }
-        acc += seg;
-      }
-      return 0;
-    }
-
     function updateBadges(segments, currentSpeedKmh) {
       if (!map) return;
       for (const m of badgeMarkers) m.remove();
       badgeMarkers = [];
       const connectorFeatures = [];
 
-      for (const seg of segments) {
-        if (seg.isBehind) continue;
-
-        if (debugMode) {
+      if (debugMode) {
+        for (const seg of segments) {
+          if (seg.isBehind) continue;
           const startEl = document.createElement('div');
           startEl.className = 'debug-start-node';
           startEl.textContent = '▶';
@@ -723,37 +679,32 @@
               .addTo(map)
           );
         }
+      }
 
-        for (const turn of (seg.turns ?? [])) {
-          const limit = corneringSpeed(turn.radius, CFG.aThreshold);
-          if (limit === null) continue;
+      for (const item of badgeItems(segments, currentSpeedKmh, CFG.aThreshold)) {
+        const el = document.createElement('div');
+        el.className = 'speed-badge';
+        if (item.isOver) el.classList.add('over');
+        el.textContent = String(item.limit);
 
-          const el = document.createElement('div');
-          el.className = 'speed-badge';
-          const over = currentSpeedKmh > limit;
-          if (over) el.classList.add('over');
-          el.textContent = String(limit);
+        const nodePos = ptAtDistance(item.pts, item.turnDistance);
+        let badgePos = nodePos;
 
-          const nodePos = ptAtDistance(seg.pts, turn.distance);
-          let badgePos = nodePos;
-
-          if (debugMode) {
-            const roadBear = bearingAtDistance(seg.pts, turn.distance);
-            const perpBear = (roadBear + 90) % 360;
-            const [offLat, offLon] = destPoint(nodePos[1], nodePos[0], perpBear, 40);
-            badgePos = [offLon, offLat];
-            connectorFeatures.push({
-              type: 'Feature',
-              geometry: { type: 'LineString', coordinates: [nodePos, badgePos] },
-              properties: { color: over ? '#e33' : '#3a9' },
-            });
-          }
-
-          const marker = new window.maplibregl.Marker({ element: el })
-            .setLngLat(badgePos)
-            .addTo(map);
-          badgeMarkers.push(marker);
+        if (debugMode) {
+          const roadBear = bearingAtDistance(item.pts, item.turnDistance);
+          const perpBear = (roadBear + 90) % 360;
+          const [offLat, offLon] = destPoint(nodePos[1], nodePos[0], perpBear, 40);
+          badgePos = [offLon, offLat];
+          connectorFeatures.push({
+            type: 'Feature',
+            geometry: { type: 'LineString', coordinates: [nodePos, badgePos] },
+            properties: { color: item.isOver ? '#e33' : '#3a9' },
+          });
         }
+
+        badgeMarkers.push(
+          new window.maplibregl.Marker({ element: el }).setLngLat(badgePos).addTo(map)
+        );
       }
 
       if (map.getSource('debug-connectors')) {
@@ -766,47 +717,17 @@
 
     function updateSegmentOverlay(segments, currentSpeedKmh) {
       if (!map || !map.getSource('segments-ahead')) return;
-      const features = segments.map(seg => {
-        // Color by the most restrictive turn in this segment
-        const limits = (seg.turns ?? [])
-          .map(t => corneringSpeed(t.radius, CFG.aThreshold))
-          .filter(l => l !== null);
-        const minLimit = limits.length > 0 ? Math.min(...limits) : null;
-        let color = '#888';
-        if (minLimit !== null) {
-          if (currentSpeedKmh > minLimit)           color = '#e33';
-          else if (currentSpeedKmh > minLimit - 10) color = '#f90';
-          else                                      color = '#3a9';
-        }
-        return {
-          type: 'Feature',
-          geometry: { type: 'LineString', coordinates: seg.pts },
-          properties: { color },
-        };
-      });
-      map.getSource('segments-ahead').setData({ type: 'FeatureCollection', features });
+      map.getSource('segments-ahead').setData(
+        segmentsGeoJSON(segments, currentSpeedKmh, CFG.aThreshold)
+      );
     }
 
     function updateDebugTriplets(segments, maxTurnRadius) {
       if (!map || !map.getSource('debug-triplets')) return;
-      if (!debugMode) {
-        map.getSource('debug-triplets').setData({ type: 'FeatureCollection', features: [] });
-        return;
-      }
-      const features = [];
-      for (const seg of segments) {
-        if (seg.isBehind) continue;
-        const pts = seg.pts;
-        for (let i = 1; i < pts.length - 1; i++) {
-          const r = circumradius(pts[i - 1], pts[i], pts[i + 1]);
-          features.push({
-            type: 'Feature',
-            geometry: { type: 'LineString', coordinates: [pts[i - 1], pts[i], pts[i + 1]] },
-            properties: { color: r <= maxTurnRadius ? '#ff0' : '#555' },
-          });
-        }
-      }
-      map.getSource('debug-triplets').setData({ type: 'FeatureCollection', features });
+      map.getSource('debug-triplets').setData({
+        type: 'FeatureCollection',
+        features: debugMode ? debugTripletFeatures(segments, maxTurnRadius) : [],
+      });
     }
 
     // ── GPS ────────────────────────────────────────────────────────────────────
@@ -824,30 +745,9 @@
 
     function onPos(pos) {
       if (posMode === 'manual') return;
-      const { latitude: lat, longitude: lon, speed, heading, accuracy } = pos.coords;
-
-      S.lat = lat;
-      S.lon = lon;
-      S.speed = speed ?? 0;
-      S.accuracy = accuracy;
-
-      // Update heading only when moving fast enough
-      if (speed !== null && speed > CFG.minSpeedForHeading && heading !== null) {
-        S.heading = heading;
-        S.lastHeading = heading;
-      } else if (speed !== null && speed > CFG.minSpeedForHeading &&
-                 S.prevLat !== null && S.prevLon !== null) {
-        // Compute heading from consecutive positions
-        const computed = bearingTo(S.prevLat, S.prevLon, lat, lon);
-        S.heading = computed;
-        S.lastHeading = computed;
-      }
-
-      S.prevLat = lat;
-      S.prevLon = lon;
-
-      setPosInputs(lon, lat, S.lastHeading);
-      updateCarPosition(lon, lat);
+      Object.assign(S, applyGPS(S, pos.coords, CFG.minSpeedForHeading));
+      setPosInputs(S.lon, S.lat, S.lastHeading);
+      updateCarPosition(S.lon, S.lat);
       renderDashboard();
     }
 
@@ -858,46 +758,9 @@
     // ── Motion / Accelerometer ─────────────────────────────────────────────────
     function initMotion() {
       const handler = (e) => {
-        // Orientation angles from deviceorientation
-        // beta / gamma come from deviceorientation, not devicemotion
-        // We use what we have in S.beta, S.gamma
-
-        let ax, ay, az;
-        if (e.acceleration &&
-            e.acceleration.x !== null &&
-            e.acceleration.y !== null &&
-            e.acceleration.z !== null) {
-          // Pure acceleration without gravity
-          ax = e.acceleration.x;
-          ay = e.acceleration.y;
-          az = e.acceleration.z;
-        } else if (e.accelerationIncludingGravity &&
-                   e.accelerationIncludingGravity.x !== null) {
-          // Remove gravity component
-          const raw = removeGravity(
-            e.accelerationIncludingGravity.x,
-            e.accelerationIncludingGravity.y,
-            e.accelerationIncludingGravity.z,
-            S.beta, S.gamma
-          );
-          ax = raw.x; ay = raw.y; az = raw.z;
-        } else {
-          return;
-        }
-
-        // Rotate to world frame, then to car frame
-        const world = phoneToWorldFrame(ax, ay, az, S.beta, S.gamma);
-        const car   = worldToCarFrame(world.east, world.north, S.lastHeading);
-
-        const G = 9.81;
-        const latRaw  = Math.abs(car.lateral)  / G;
-        const longRaw = Math.abs(car.forward)  / G;
-
-        S.smoothLat  = applyEMA(S.smoothLat,  latRaw,  CFG.smoothAlpha);
-        S.smoothLong = applyEMA(S.smoothLong, longRaw, CFG.smoothAlpha);
-        S.latG  = S.smoothLat;
-        S.longG = S.smoothLong;
-
+        const update = applyMotion(S, e, CFG.smoothAlpha);
+        if (update === null) return;
+        Object.assign(S, update);
         renderGMeters();
       };
 
@@ -920,15 +783,7 @@
       window.addEventListener('deviceorientationabsolute', (e) => {
         if (e.alpha == null) return;
 
-        // Circular EMA
-        if (S.smoothAbsHeading === null) {
-          S.smoothAbsHeading = e.alpha;
-        } else {
-          let diff = e.alpha - S.smoothAbsHeading;
-          if (diff > 180) diff -= 360;
-          if (diff < -180) diff += 360;
-          S.smoothAbsHeading = (S.smoothAbsHeading + 0.1 * diff + 360) % 360;
-        }
+        S.smoothAbsHeading = smoothCompass(S.smoothAbsHeading, e.alpha);
 
         const el = document.getElementById('map-bearing');
         if (el) {
@@ -980,35 +835,20 @@
       updateSegmentOverlay(segments, kmh);
       updateDebugTriplets(segments, maxTurnRadius);
 
-      // Nearest-turn badge (always visible when a turn is ahead)
-      let nearestTurn = null;
-      let nearestLimit = null;
-      for (const seg of segments) {
-        if (seg.isBehind) continue;
-        for (const turn of (seg.turns ?? [])) {
-          if (nearestTurn === null || turn.distance < nearestTurn.distance) {
-            nearestTurn = turn;
-            nearestLimit = corneringSpeed(turn.radius, CFG.aThreshold);
-          }
-        }
-      }
+      // Nearest-turn corner badge
+      const badge = computeCornerBadge(segments, kmh, CFG.aThreshold);
       const cornerBadge = document.getElementById('corner-badge');
-      if (nearestTurn !== null && nearestLimit !== null) {
+      if (badge !== null) {
         cornerBadge.style.display = 'flex';
         const speedEl = document.getElementById('corner-badge-speed');
-        speedEl.textContent = String(nearestLimit);
-        speedEl.classList.toggle('over', kmh > nearestLimit);
-        document.getElementById('corner-badge-dist').textContent = `in ${Math.round(nearestTurn.distance)} m`;
+        speedEl.textContent = String(badge.limit);
+        speedEl.classList.toggle('over', badge.isOver);
+        document.getElementById('corner-badge-dist').textContent = `in ${Math.round(badge.distance)} m`;
       } else {
         cornerBadge.style.display = 'none';
       }
 
-      // Status
-      const roadCount = features.length;
-      const distStr = match ? `${Math.round(match.dist)} m to road` : 'no road';
-      const aheadCount = segments.filter(s => !s.isBehind).length;
-      const behindCount = segments.filter(s => s.isBehind).length;
-      setStatus(`±${Math.round(S.accuracy ?? 0)} m · ${roadCount} roads · ${aheadCount}↑ ${behindCount}↓ edges · ${distStr}`);
+      setStatus(statusText(features, segments, match, S.accuracy));
     }
 
     function renderGMeters() {
@@ -1017,12 +857,11 @@
     }
 
     function setBar(id, value, limit) {
-      const pct = Math.min(100, (value / (limit * 2)) * 100);
+      const { pct, className, text } = barState(value, limit);
       const fill = document.getElementById(id + '-fill');
       fill.style.width = pct + '%';
-      fill.className = 'g-bar'
-        + (value > limit ? ' over' : value > limit * 0.7 ? ' warn' : '');
-      document.getElementById(id + '-val').textContent = value.toFixed(2) + 'g';
+      fill.className = 'g-bar' + (className ? ' ' + className : '');
+      document.getElementById(id + '-val').textContent = text;
     }
 
     function setStatus(msg) {
