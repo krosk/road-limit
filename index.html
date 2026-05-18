@@ -24,44 +24,41 @@
       right: 12px;
       z-index: 10;
       display: none;
-      flex-direction: column;
-      align-items: center;
-      gap: 6px;
+      background: rgba(17, 17, 17, 0.85);
+      border-radius: 14px;
+      padding: 10px 16px;
+      min-width: 90px;
     }
 
     #turn-card-arrow {
-      font-size: 32px;
+      font-size: 20px;
       line-height: 1;
-      filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.8));
+      color: #888;
+      margin-bottom: 2px;
     }
 
     #turn-card-speed {
-      width: 80px;
-      height: 80px;
-      border-radius: 50%;
-      background: #fff;
-      border: 5px solid #e33;
-      color: #000;
-      font-size: 28px;
+      font-size: 64px;
       font-weight: 700;
-      display: flex;
-      align-items: center;
-      justify-content: center;
+      line-height: 1;
       font-variant-numeric: tabular-nums;
     }
 
     #turn-card-speed.over {
-      background: #e33;
-      color: #fff;
+      color: #e33;
+    }
+
+    #turn-card-unit {
+      font-size: 16px;
+      color: #888;
+      margin-left: 2px;
     }
 
     #turn-card-info {
       font-size: 12px;
-      color: #fff;
-      background: rgba(17, 17, 17, 0.75);
-      padding: 2px 8px;
-      border-radius: 6px;
-      text-align: center;
+      color: #aaa;
+      margin-top: 4px;
+      min-height: 16px;
     }
 
     /* Map: full screen */
@@ -389,7 +386,7 @@
   <!-- Turn summary card -->
   <div id="turn-card">
     <div id="turn-card-arrow"></div>
-    <div id="turn-card-speed">—</div>
+    <div><span id="turn-card-speed">—</span><span id="turn-card-unit">km/h</span></div>
     <div id="turn-card-info"></div>
   </div>
 
@@ -841,7 +838,7 @@
       const card = computeTurnCard(turnData, kmh);
       const turnCardEl = document.getElementById('turn-card');
       if (card !== null) {
-        turnCardEl.style.display = 'flex';
+        turnCardEl.style.display = 'block';
         document.getElementById('turn-card-arrow').textContent = card.direction === 'right' ? '→' : '←';
         const speedEl = document.getElementById('turn-card-speed');
         speedEl.textContent = String(card.minSpeed);
