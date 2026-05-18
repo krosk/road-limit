@@ -46,7 +46,7 @@ test/
   motion.test.js        unit tests for lib/motion.js
   state.test.js         unit tests for lib/state.js
   display.test.js       unit tests for lib/display.js
-                        131 unit tests total across all lib files
+                        133 unit tests total across all lib files
 e2e/
   dashboard.spec.js     Playwright: mocks GPS + road features
   fixtures/             JSON road-feature fixtures for replay testing
@@ -93,7 +93,8 @@ function in a lib module, unit-testable without a browser.
 | `onPos` | GPS callback — calls `applyGPS`, then `renderDashboard` |
 | `applyManualPos` | reads SET-mode inputs, mutates state |
 | `setPosInputs` | writes position to DOM inputs |
-| `setStatus` | writes status line to DOM |
+| `setStatus` | writes status line to DOM (no-op while `statusPinnedUntil` is in the future) |
+| `pinStatus` | writes status line and blocks `setStatus` for N ms (prevents GPS render loop from overwriting transient messages) |
 | `setBar` | updates G-bar DOM using `barState` |
 
 ## External API dependencies
@@ -104,7 +105,7 @@ function in a lib module, unit-testable without a browser.
 | **OpenFreeMap CDN** | vector tile style (`liberty`) | `initMap` |
 | **Geolocation API** | GPS position | `initGPS` → `onPos` |
 | **Device Sensors API** | accelerometer (`devicemotion`), orientation (`deviceorientation`), absolute compass (`deviceorientationabsolute`) | `initMotion` |
-| **Fetch API** | `HEAD index.html` for deployed timestamp | startup |
+| **Fetch API** | `HEAD index.html` for deployed timestamp; GitHub API (`/repos/krosk/road-limit/commits/main`) for commit SHA | startup |
 
 ### queryRenderedFeatures viewport constraint
 
@@ -152,9 +153,19 @@ WebGL canvas. Consequences:
   from consecutive center positions (2 m threshold) and sets `S.heading`
   automatically.
 - **normaliseFeatures**: `queryRenderedFeatures` returns `MultiLineString`
-  for roads that cross tile boundaries. `normaliseFeatures` in `lib/road.js`
-  expands these into individual `LineString` features before any lib code
-  sees them. This is a pure function and is unit-tested independently.
+  for roads that cross tile boundaries, and also returns the same physical
+  road multiple times (once per tile layer). `normaliseFeatures` in
+  `lib/road.js` (1) expands MultiLineString into individual LineStrings,
+  (2) deduplicates by `${first_coord};${last_coord}` key, and (3) strips
+  MapLibre internal fields (`_vectorTileFeature` etc.) to keep fixtures
+  small (~60× size reduction). Pure function, unit-tested independently.
+- **Junction suppression in `firstTurnAhead`**: after BFS, forward segments
+  are grouped by initial bearing (30° tolerance). Groups within 30° of each
+  other are the same physical road split across OSM features (tile edges,
+  layer duplicates). Only `dirGroups.length !== 1` — genuinely distinct
+  directions — suppresses the turn card. This prevents spurious "junction"
+  detection on straight roads where `queryRenderedFeatures` returns two
+  overlapping features for the same road.
 
 ## Configuration
 
@@ -192,26 +203,65 @@ the bottom panel for live tuning without reloading.
 
 ## Capturing real-world road fixtures
 
-The **CPY** button in the bottom panel copies the current road topology to
-the clipboard as JSON (`window.__lastFeatures` after normalisation).
+The **CPY** button downloads a `roads.json` file containing both diagnostic
+metadata and the current road topology.
+
+### CPY download format
+
+```json
+{
+  "meta": {
+    "commit": "abc1234",
+    "timestamp": "2026-05-18T10:00:00.000Z",
+    "position": { "lon": 2.348, "lat": 48.853, "heading": 90, "accuracy": 5 },
+    "speed": 50,
+    "map": { "zoom": 16, "pitch": 60, "bearing": 90 },
+    "cfg": { "lookahead": 120, "roadMatchMaxDist": 30, "aThreshold": 2.943 },
+    "match": { "dist": 8, "road": "Rue de Rivoli", "class": "primary" },
+    "segments": { "forward": 1, "behind": 0 },
+    "turnReason": null,
+    "turnCard": { ... }
+  },
+  "features": [ /* GeoJSON LineString features as returned by normaliseFeatures */ ]
+}
+```
+
+`loadFixture` in `dashboard.spec.js` and `mockFeatures` both accept either
+format: a bare array of features, or `{ meta, features }`.
 
 Workflow for adding a fixture-based test for a real location:
 1. Open the app, switch to **SET** mode, drag the map to the target location.
 2. Wait for the status line to show a road count (tiles loaded).
-3. Press **CPY** — button flashes ✓ on success.
-4. Paste the JSON into `e2e/fixtures/<name>.json`.
+3. Press **CPY** — browser downloads `roads.json`.
+4. Rename and move to `e2e/fixtures/<name>.json`.
 5. Write a test in `e2e/dashboard.spec.js` using `loadFixture('<name>')`.
 6. Provide the fixture JSON and expected behaviour to an agent to generate
    the test, or write it directly using the existing fixture tests as a model.
 
-The fixture JSON is an array of GeoJSON `LineString` features in the same
-shape returned by `normaliseFeatures`. It plugs directly into `segmentsAhead`
-for unit tests, or into `mockFeatures` for e2e tests.
+The `features` array plugs directly into `segmentsAhead` for unit tests, or
+into `mockFeatures` for e2e tests.
 
 **CPY feedback:**
-- **✓** — copied successfully
+- **✓** — downloaded successfully
 - **—** — no features loaded yet
-- **✗** — clipboard API refused (requires HTTPS or localhost)
+
+### LDR — load a fixture at runtime
+
+The **LDR** button next to CPY opens a file picker. Loading a `roads.json`
+file (CPY format) restores the full app state for before/after comparison:
+- Injects features via `window.__mockFeatures` (bypasses `queryRenderedFeatures`)
+- Switches to SET mode and applies `meta.position` (lon, lat, heading)
+- Restores `meta.map` (zoom, pitch, bearing) via `map.jumpTo`
+- Restores `meta.cfg` (lookahead, roadMatchMaxDist) including UI inputs
+- Calls `renderDashboard()` immediately
+- Shows `Loaded N features @ <commit>` in the status line for 4 s
+
+**LDR feedback:**
+- **✓** — loaded successfully (status line shows feature count + commit)
+- **✗** — file parse error (status line shows error message for 5 s)
+
+The file input is always reset after load, so the same file can be reloaded
+repeatedly (useful for before/after comparison after a code change).
 
 ## Test hooks (for Playwright and manual debugging)
 
@@ -219,8 +269,12 @@ for unit tests, or into `mockFeatures` for e2e tests.
 - `window.__setMockFeatures(features)` / `window.__mockFeatures` — inject
   fake GeoJSON LineString features, bypassing `queryRenderedFeatures`.
 - `window.__lastFeatures` — always holds the last result from
-  `queryRenderedFeatures` (after normalisation). Also accessible via the
-  **CPY** button.
+  `queryRenderedFeatures` (after normalisation). Downloaded by the **CPY**
+  button.
+- `window.__lastDiag` — snapshot of diagnostic state written at the end of
+  every `renderDashboard()` call. Shape matches the `meta` field in the CPY
+  download. Useful in DevTools to understand why a turn card is/isn't shown:
+  check `__lastDiag.turnReason`, `__lastDiag.segments`, `__lastDiag.match`.
 
 ## Debug mode (DBG)
 
@@ -255,6 +309,8 @@ In **GPS** mode the fields are read-only and show the live GPS position.
 - `queryRenderedFeatures` returns clipped geometries at tile boundaries;
   roads crossing a tile edge arrive as MultiLineString — normalised to
   individual LineStrings by `normaliseFeatures` in `lib/road.js`.
+  `queryRenderedFeatures` also returns the same road multiple times (once
+  per tile layer); `normaliseFeatures` deduplicates by first+last coordinate.
 - `queryRenderedFeatures` returns 0 features while tiles are still loading
   (e.g. immediately after a drag in SET mode). The `idle` event triggers a
   re-render once tiles settle.
