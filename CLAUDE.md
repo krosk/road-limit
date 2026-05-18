@@ -46,7 +46,7 @@ test/
   motion.test.js        unit tests for lib/motion.js
   state.test.js         unit tests for lib/state.js
   display.test.js       unit tests for lib/display.js
-                        136 unit tests total across all lib files
+                        137 unit tests total across all lib files
 e2e/
   dashboard.spec.js     Playwright: mocks GPS + road features
   fixtures/             JSON road-feature fixtures for replay testing
@@ -164,12 +164,14 @@ WebGL canvas. Consequences:
   MapLibre internal fields (`_vectorTileFeature` etc.) to keep fixtures
   small (~60× size reduction). Pure function, unit-tested independently.
 - **Junction suppression in `firstTurnAhead`**: after BFS, forward segments
-  are grouped by initial bearing (30° tolerance). Groups within 30° of each
+  are grouped by net bearing (30° tolerance). Groups within 30° of each
   other are the same physical road split across OSM features (tile edges,
-  layer duplicates). Only `dirGroups.length !== 1` — genuinely distinct
-  directions — suppresses the turn card. This prevents spurious "junction"
-  detection on straight roads where `queryRenderedFeatures` returns two
-  overlapping features for the same road.
+  layer duplicates). After grouping, direction groups whose `roadClass` is
+  in `MINOR_CLASSES` (`track`, `path`, `footway`, `cycleway`, `steps`,
+  `bridleway`) are discarded when at least one group is on a proper driveable
+  road — field tracks and footpaths that happen to branch off are not genuine
+  turn options. Only `dirGroups.length !== 1` — genuinely distinct driveable
+  directions — suppresses the turn card.
 
 ## Configuration
 

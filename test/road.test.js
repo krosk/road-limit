@@ -354,6 +354,30 @@ test('firstTurnAhead: turn beyond lookahead → null', () => {
   assert.strictEqual(firstTurnAhead([leftTurnFeature], 2.0, 48.0, 90, 50, MAX_R, A, 50), null);
 });
 
+test('firstTurnAhead: track branching off a tertiary road does not suppress turn card', () => {
+  // Car heading east on a tertiary road that turns left (north) ahead.
+  // A track branches northward from the same junction.
+  // Both pass the net-bearing filter (90° from heading), but the track
+  // has class=track → MINOR_CLASSES → discarded, leaving 1 group → turn shown.
+  const tertiaryRoad = {
+    type: 'Feature',
+    geometry: { type: 'LineString', coordinates: [
+      [2.0, 48.0], [2.001, 48.0], [2.002, 48.0], [2.002, 48.001],
+    ]},
+    properties: { class: 'tertiary' },
+  };
+  const trackBranch = {
+    type: 'Feature',
+    geometry: { type: 'LineString', coordinates: [
+      [2.002, 48.0], [2.002, 48.001], [2.002, 48.002],
+    ]},
+    properties: { class: 'track' },
+  };
+  const result = firstTurnAhead([tertiaryRoad, trackBranch], 2.0, 48.0, 90, 500, MAX_R, A, 50);
+  assert.ok(result !== null, 'track branch should be discarded; turn card must show');
+  assert.strictEqual(result.direction, 'left');
+});
+
 test('firstTurnAhead: junction (2 forward segments) → null', () => {
   // Branch road with second node ~89 m away — fits within 120 m budget
   const branchFeature = {
