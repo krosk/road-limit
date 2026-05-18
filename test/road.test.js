@@ -5,6 +5,7 @@ import {
   distToSegment,
   collectAhead,
   detectTurn,
+  detectAllTurns,
   corneringSpeed,
   isSingleRoadAhead,
   segmentsAhead,
@@ -130,6 +131,29 @@ test('detectTurn: gentle curve above maxRadius threshold → null', () => {
   ];
   const result = detectTurn(pts, 10); // very small maxRadius — only extremely tight curves
   assert.strictEqual(result, null);
+});
+
+// ── detectAllTurns ────────────────────────────────────────────────────────────
+
+test('detectAllTurns: S-bend (two 90° turns) → returns 2 turns', () => {
+  // Go east, turn north, go north, turn east again (S-bend with 4 nodes of straight between turns)
+  const pts = [
+    [2.0,   48.0],
+    [2.001, 48.0],   // going east
+    [2.001, 48.001], // first turn: east→north
+    [2.001, 48.002],
+    [2.001, 48.003],
+    [2.001, 48.004],
+    [2.002, 48.004], // second turn: north→east
+    [2.003, 48.004],
+  ];
+  const result = detectAllTurns(pts, 2000);
+  assert.ok(result.length >= 2, `Expected at least 2 turns, got ${result.length}`);
+});
+
+test('detectAllTurns: straight road → empty array', () => {
+  const pts = [[2.0, 48.0], [2.0, 48.001], [2.0, 48.002], [2.0, 48.003]];
+  assert.deepStrictEqual(detectAllTurns(pts), []);
 });
 
 // ── corneringSpeed ───────────────────────────────────────────────────────────
