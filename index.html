@@ -915,7 +915,19 @@
         const webkit = e.webkitCompassHeading;
         const alpha  = e.alpha;
         const el = document.getElementById('compass-raw');
-        if (el) el.textContent = `wk ${webkit != null ? Math.round(webkit) : '—'}°  α ${alpha != null ? Math.round(alpha) : '—'}°`;
+        if (el) {
+          el.dataset.rel = alpha != null ? Math.round(alpha) : '—';
+          el.dataset.wk  = webkit != null ? Math.round(webkit) : '—';
+          el.textContent = `wk ${el.dataset.wk}°  α ${el.dataset.rel}°  abs ${el.dataset.abs ?? '—'}°`;
+        }
+      });
+
+      window.addEventListener('deviceorientationabsolute', (e) => {
+        const el = document.getElementById('compass-raw');
+        if (el) {
+          el.dataset.abs = e.alpha != null ? Math.round(e.alpha) : '—';
+          el.textContent = `wk ${el.dataset.wk ?? '—'}°  α ${el.dataset.rel ?? '—'}°  abs ${el.dataset.abs}°`;
+        }
       });
     }
 
