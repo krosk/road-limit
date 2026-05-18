@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>road-limit — function map</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<style>
+  body { margin: 0; background: #1a1a2e; display: flex; justify-content: center; align-items: flex-start; min-height: 100vh; }
+  .mermaid { max-width: 100vw; padding: 24px; }
+</style>
+</head>
+<body>
+<div class="mermaid">
+mindmap
+  root((road-limit))
+    geo.js
+      Distance
+        haversine
+      Direction
+        bearingTo
+        angleDiff
+        bearingAtDistance
+      Geometry
+        circumradius
+        destPoint
+        ptAtDistance
+    road.js
+      Matching
+        distToSegment
+        matchRoad
+        collectAhead
+      Detection
+        detectTurn
+        detectAllTurns
+        segmentsAhead
+      Speed
+        parseSpeed
+        corneringSpeed
+        isSingleRoadAhead
+    motion.js
+      Gravity
+        gravityInDeviceFrame
+        removeGravity
+      Transform
+        phoneToWorldFrame
+        worldToCarFrame
+      Smooth
+        applyEMA
+    config.js
+      DEFAULT_CFG
+    state.js
+      createState
+      GPS
+        applyGPS
+      Compass
+        smoothCompass
+      Motion
+        applyMotion
+    display.js
+      Badge
+        computeCornerBadge
+        badgeItems
+      Colour
+        segmentLineColor
+        segmentsGeoJSON
+      Text
+        statusText
+      G-meter
+        barState
+      Debug
+        debugTripletFeatures
+    index.html
+      Init
+        initMap
+        initGPS
+        initMotion
+      Events
+        onPos
+        onGPSErr
+      Position
+        applyManualPos
+        setPosInputs
+        updateCarPosition
+      Data
+        getRoadFeatures
+      Render
+        renderDashboard
+        renderGMeters
+        setBar
+        setStatus
+      Overlay
+        updateBadges
+        updateSegmentOverlay
+        updateDebugTriplets
+</div>
+<script>mermaid.initialize({ theme: 'dark', startOnLoad: true });</script>
+</body>
+</html>
