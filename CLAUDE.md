@@ -4,6 +4,11 @@ Live driving dashboard for cross-checking insurer telematics penalties.
 Tracks speed, G-force, and upcoming turn constraints, and compares them
 against road speed limits from OpenStreetMap.
 
+## Deployment
+
+The app is a static site with no build step. Pushing to `main` on GitHub
+automatically publishes it via GitHub Pages.
+
 ## Commands
 
 ```bash
