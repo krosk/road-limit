@@ -944,13 +944,13 @@
           el.textContent = `wk ${el.dataset.wk ?? '—'}°  α ${el.dataset.rel ?? '—'}°  abs ${el.dataset.abs}°`;
         }
 
-        // Rotate map at low speed — instant set, EMA provides the smoothing
+        // Rotate map at low speed without touching S.lastHeading (which drives BFS)
         if (posMode !== 'gps' || (S.speed ?? 0) >= CFG.minSpeedForHeading) return;
         if (!_compassMapRaf) {
           _compassMapRaf = true;
           requestAnimationFrame(() => {
             _compassMapRaf = false;
-            if (map) map.setBearing(S.smoothAbsHeading);
+            if (map) map.easeTo({ bearing: S.smoothAbsHeading, duration: 200 });
           });
         }
       });
