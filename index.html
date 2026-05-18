@@ -937,12 +937,26 @@
         return;
       }
       const text = JSON.stringify(features);
-      const flash = (ok) => {
+      const flash = (ok, err) => {
+        if (err) console.error('CPY failed:', err);
         btn.textContent = ok ? '✓' : '✗';
         setTimeout(() => { btn.textContent = 'CPY'; }, 1500);
       };
-      // execCommand must run synchronously inside the gesture handler; try it first.
-      // Fall back to the async clipboard API only if execCommand is unsupported.
+      // On secure contexts prefer the Clipboard API — call it immediately so the
+      // user-gesture activation is still live. Fall back to execCommand otherwise.
+      if (navigator.clipboard?.writeText) {
+        navigator.clipboard.writeText(text)
+          .then(() => flash(true))
+          .catch((err) => {
+            console.warn('CPY: clipboard API failed, trying execCommand:', err);
+            cpyExecCommand(text, flash);
+          });
+      } else {
+        cpyExecCommand(text, flash);
+      }
+    });
+
+    function cpyExecCommand(text, flash) {
       const ta = document.createElement('textarea');
       ta.value = text;
       ta.setAttribute('readonly', '');
@@ -950,17 +964,12 @@
       document.body.appendChild(ta);
       ta.focus();
       ta.select();
+      ta.setSelectionRange(0, text.length); // iOS requires this instead of select()
       let ok = false;
-      try { ok = document.execCommand('copy'); } catch {}
+      try { ok = document.execCommand('copy'); } catch (e) { flash(false, e); return; }
       document.body.removeChild(ta);
-      if (ok) {
-        flash(true);
-      } else if (navigator.clipboard?.writeText) {
-        navigator.clipboard.writeText(text).then(() => flash(true)).catch(() => flash(false));
-      } else {
-        flash(false);
-      }
-    });
+      flash(ok, ok ? null : new Error('execCommand returned false'));
+    }
 
     // ── Start button ───────────────────────────────────────────────────────────
     document.getElementById('start-btn').addEventListener('click', async () => {
