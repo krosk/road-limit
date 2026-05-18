@@ -446,7 +446,7 @@
 
   <script type="module">
     import { haversine, bearingTo, destPoint, ptAtDistance, bearingAtDistance } from './lib/geo.js';
-    import { matchRoad, segmentsAhead } from './lib/road.js';
+    import { matchRoad, segmentsAhead, normaliseFeatures } from './lib/road.js';
     import { DEFAULT_CFG } from './lib/config.js';
     import { createState, applyGPS, smoothCompass, applyMotion } from './lib/state.js';
     import { computeCornerBadge, segmentsGeoJSON, statusText, barState, badgeItems, debugTripletFeatures } from './lib/display.js';
@@ -524,19 +524,7 @@
       if (_mockFeatures !== null) return _mockFeatures;
       if (!map || !map.isStyleLoaded() || roadLayers.length === 0) return [];
       const raw = map.queryRenderedFeatures({ layers: roadLayers });
-      // MapLibre returns MultiLineString for roads that cross tile boundaries.
-      // Expand each into individual LineString features so lib code handles them.
-      const f = [];
-      for (const feat of raw) {
-        const type = feat.geometry?.type;
-        if (type === 'LineString') {
-          f.push(feat);
-        } else if (type === 'MultiLineString') {
-          for (const coords of feat.geometry.coordinates) {
-            f.push({ ...feat, geometry: { type: 'LineString', coordinates: coords } });
-          }
-        }
-      }
+      const f = normaliseFeatures(raw);
       window.__lastFeatures = f;
       return f;
     }

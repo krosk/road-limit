@@ -9,6 +9,7 @@ import {
   corneringSpeed,
   isSingleRoadAhead,
   segmentsAhead,
+  normaliseFeatures,
 } from '../lib/road.js';
 import { haversine } from '../lib/geo.js';
 
@@ -268,4 +269,59 @@ test('segmentsAhead: lookBehind > 0 → includes segment behind car', () => {
   const segsWithLookBehind = segmentsAhead(features, lon, lat, 90, 500, 2000, 500);
   assert.strictEqual(segsNoLookBehind.length, 1, `Without lookBehind expected 1, got ${segsNoLookBehind.length}`);
   assert.strictEqual(segsWithLookBehind.length, 2, `With lookBehind expected 2, got ${segsWithLookBehind.length}`);
+});
+
+// ── normaliseFeatures ─────────────────────────────────────────────────────────
+
+const coords = [[2, 48], [2.001, 48]];
+
+test('normaliseFeatures: empty input → empty output', () => {
+  assert.deepEqual(normaliseFeatures([]), []);
+});
+
+test('normaliseFeatures: LineString passed through unchanged', () => {
+  const feat = { type: 'Feature', geometry: { type: 'LineString', coordinates: coords }, properties: {} };
+  const result = normaliseFeatures([feat]);
+  assert.equal(result.length, 1);
+  assert.equal(result[0].geometry.type, 'LineString');
+  assert.deepEqual(result[0].geometry.coordinates, coords);
+});
+
+test('normaliseFeatures: MultiLineString expanded into separate LineStrings', () => {
+  const coords2 = [[2.002, 48], [2.003, 48]];
+  const feat = {
+    type: 'Feature',
+    geometry: { type: 'MultiLineString', coordinates: [coords, coords2] },
+    properties: { name: 'road' },
+  };
+  const result = normaliseFeatures([feat]);
+  assert.equal(result.length, 2);
+  assert.equal(result[0].geometry.type, 'LineString');
+  assert.equal(result[1].geometry.type, 'LineString');
+  assert.deepEqual(result[0].geometry.coordinates, coords);
+  assert.deepEqual(result[1].geometry.coordinates, coords2);
+});
+
+test('normaliseFeatures: expanded features inherit properties', () => {
+  const feat = {
+    type: 'Feature',
+    geometry: { type: 'MultiLineString', coordinates: [coords, coords] },
+    properties: { maxspeed: '50' },
+  };
+  const result = normaliseFeatures([feat]);
+  assert.equal(result[0].properties.maxspeed, '50');
+  assert.equal(result[1].properties.maxspeed, '50');
+});
+
+test('normaliseFeatures: unknown geometry types ignored', () => {
+  const feat = { type: 'Feature', geometry: { type: 'Point', coordinates: [2, 48] }, properties: {} };
+  assert.deepEqual(normaliseFeatures([feat]), []);
+});
+
+test('normaliseFeatures: mixed input normalised correctly', () => {
+  const line = { type: 'Feature', geometry: { type: 'LineString', coordinates: coords }, properties: {} };
+  const multi = { type: 'Feature', geometry: { type: 'MultiLineString', coordinates: [coords, coords] }, properties: {} };
+  const result = normaliseFeatures([line, multi]);
+  assert.equal(result.length, 3);
+  assert.ok(result.every(f => f.geometry.type === 'LineString'));
 });
