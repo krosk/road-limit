@@ -936,16 +936,29 @@
         setTimeout(() => { btn.textContent = 'CPY'; }, 1000);
         return;
       }
-      navigator.clipboard.writeText(JSON.stringify(features, null, 2))
-        .then(() => {
-          btn.textContent = '✓';
-          setTimeout(() => { btn.textContent = 'CPY'; }, 1500);
-        })
-        .catch(() => {
-          btn.textContent = '✗';
-          setTimeout(() => { btn.textContent = 'CPY'; }, 1500);
-        });
+      const text = JSON.stringify(features, null, 2);
+      const flash = (ok) => {
+        btn.textContent = ok ? '✓' : '✗';
+        setTimeout(() => { btn.textContent = 'CPY'; }, 1500);
+      };
+      if (navigator.clipboard?.writeText) {
+        navigator.clipboard.writeText(text).then(() => flash(true)).catch(() => execCopy(text, flash));
+      } else {
+        execCopy(text, flash);
+      }
     });
+
+    function execCopy(text, flash) {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.cssText = 'position:fixed;opacity:0;top:0;left:0';
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      try { flash(document.execCommand('copy')); }
+      catch { flash(false); }
+      document.body.removeChild(ta);
+    }
 
     // ── Start button ───────────────────────────────────────────────────────────
     document.getElementById('start-btn').addEventListener('click', async () => {
