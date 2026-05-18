@@ -45,17 +45,25 @@ docs/adr/               architecture decision records
 - **Accelerometer calibration**: Option C — continuous transform using
   `deviceorientation` (β/γ) + GPS heading. No manual calibration step,
   self-corrects if phone shifts.
-- **Junction handling**: badges on all branches ahead; bottom alert only
-  fires on single-road stretches with no junction within lookahead.
+- **Junction handling**: badges on all branches ahead; single-road turn
+  warning removed in favour of the persistent corner badge (top-right).
 - **segmentsAhead algorithm**: BFS over the connected road graph up to
-  `CFG.lookahead` metres. Starts from the matched road, explores both
-  directions at every junction node, tracks cumulative distance budget.
-  Also walks `CFG.lookahead` metres behind the car for overlay context.
+  `CFG.lookahead` metres ahead only (lookBehind = 0). Starts from the
+  matched road, explores both directions at every junction node, tracks
+  cumulative distance budget.
 - **Turn detection (`detectAllTurns`)**: computes circumradius for every
   consecutive triplet of points. Uses a `nodeMinR` pass to propagate each
   triplet's radius to all three of its nodes, so a node flanked by two tight
   triplets is flagged even if its own triplet has a large radius. The first
   collected node (`pts[0]`) is always an endpoint and can never receive a badge.
+- **Map heading**: above `CFG.minSpeedForHeading` (5 km/h) the map rotates
+  to match GPS heading. Below that, `deviceorientationabsolute` alpha is
+  smoothed with a circular EMA (α = 0.1) and used to rotate the map only —
+  `S.lastHeading` (which drives BFS road matching) is not updated from the
+  compass, so the road overlay stays stable.
+- **SET mode drag heading**: dragging the map in SET mode computes bearing
+  from consecutive center positions (2 m threshold) and sets `S.heading`
+  automatically.
 
 ## Configuration
 
@@ -66,8 +74,7 @@ All tunable constants are in `CFG` at the top of `index.html`:
 | `lateralGLimit` | 0.30 g | harsh cornering threshold |
 | `longGLimit` | 0.40 g | harsh braking/acceleration threshold |
 | `aThreshold` | 0.30 × 9.81 m/s² | lateral acceleration for turn speed formula |
-| `lookahead` | 120 m | scan distance ahead and behind the car |
-| `urgentDist` | 200 m | turn warning becomes urgent below this distance |
+| `lookahead` | 120 m | road scan distance ahead of the car |
 | `roadMatchMaxDist` | 30 m | max distance from car to nearest road to start BFS |
 
 `aThreshold` should be tuned once the insurer's exact threshold is known.
@@ -103,12 +110,18 @@ The bottom panel has a GPS/SET toggle. In **SET** mode:
 - GPS updates are ignored until toggled back to **GPS**.
 
 In **GPS** mode the fields are read-only and show the live GPS position.
+Dragging the map in SET mode automatically infers heading from the drag
+direction (bearing between consecutive center positions, 2 m threshold).
 
 ## Known limitations
 
 - OSM speed limits are sparse on minor roads; badges show cornering speed
   estimate (from geometry) when `maxspeed` tag is absent.
-- GPS heading unreliable below ~5 km/h; last known heading is frozen.
+- GPS heading unreliable below ~5 km/h; compass takes over for map
+  rotation but `S.lastHeading` stays frozen at last GPS heading, so BFS
+  direction may be wrong if the car reverses or turns sharply while stopped.
+- `deviceorientationabsolute` not available on iOS; `webkitCompassHeading`
+  from `deviceorientation` would be the equivalent but is currently unused.
 - `queryRenderedFeatures` returns clipped geometries at tile boundaries;
   roads crossing a tile edge arrive as MultiLineString — normalised to
   individual LineStrings in `getRoadFeatures` before any lib code sees them.
