@@ -875,8 +875,14 @@
       document.getElementById(id + '-val').textContent = text;
     }
 
+    let statusPinnedUntil = 0;
     function setStatus(msg) {
+      if (Date.now() < statusPinnedUntil) return;
       document.getElementById('status-msg').textContent = msg;
+    }
+    function pinStatus(msg, ms) {
+      document.getElementById('status-msg').textContent = msg;
+      statusPinnedUntil = Date.now() + ms;
     }
 
     // ── Threshold slider ───────────────────────────────────────────────────────
@@ -939,7 +945,7 @@
       const text = JSON.stringify(features);
       const flash = (ok, err) => {
         btn.textContent = ok ? '✓' : '✗';
-        if (!ok && err) document.getElementById('status-msg').textContent = 'CPY: ' + (err.message || err);
+        if (!ok && err) pinStatus('CPY: ' + (err.message || err), 5000);
         setTimeout(() => { btn.textContent = 'CPY'; }, 1500);
       };
       // On secure contexts prefer the Clipboard API — call it immediately so the
