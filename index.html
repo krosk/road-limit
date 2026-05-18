@@ -479,7 +479,6 @@
       lat: null, lon: null, speed: 0, heading: null, lastHeading: 0, accuracy: null,
       smoothLat: 0, smoothLong: 0, latG: 0, longG: 0,
       beta: 0, gamma: 0,
-      absHeading: null, smoothAbsHeading: null,
       prevLat: null, prevLon: null,
     };
 
@@ -923,35 +922,11 @@
         }
       });
 
-      let _compassMapRaf = false;
       window.addEventListener('deviceorientationabsolute', (e) => {
-        if (e.alpha == null) return;
-
-        // Circular EMA to smooth angle wrap-around at 0/360
-        if (S.smoothAbsHeading === null) {
-          S.smoothAbsHeading = e.alpha;
-        } else {
-          let diff = e.alpha - S.smoothAbsHeading;
-          if (diff > 180) diff -= 360;
-          if (diff < -180) diff += 360;
-          S.smoothAbsHeading = (S.smoothAbsHeading + 0.1 * diff + 360) % 360;
-        }
-        S.absHeading = e.alpha;
-
         const el = document.getElementById('compass-raw');
         if (el) {
-          el.dataset.abs = Math.round(e.alpha);
+          el.dataset.abs = e.alpha != null ? Math.round(e.alpha) : '—';
           el.textContent = `wk ${el.dataset.wk ?? '—'}°  α ${el.dataset.rel ?? '—'}°  abs ${el.dataset.abs}°`;
-        }
-
-        // Rotate map at low speed without touching S.lastHeading (which drives BFS)
-        if (posMode !== 'gps' || (S.speed ?? 0) >= CFG.minSpeedForHeading) return;
-        if (!_compassMapRaf) {
-          _compassMapRaf = true;
-          requestAnimationFrame(() => {
-            _compassMapRaf = false;
-            if (map) map.easeTo({ bearing: S.smoothAbsHeading, duration: 200 });
-          });
         }
       });
     }
