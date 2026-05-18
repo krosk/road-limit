@@ -892,8 +892,14 @@
       document.getElementById(id + '-val').textContent = text;
     }
 
+    let statusPinnedUntil = 0;
     function setStatus(msg) {
+      if (Date.now() < statusPinnedUntil) return;
       document.getElementById('status-msg').textContent = msg;
+    }
+    function pinStatus(msg, ms) {
+      document.getElementById('status-msg').textContent = msg;
+      statusPinnedUntil = Date.now() + ms;
     }
 
     // ── Threshold slider ───────────────────────────────────────────────────────
