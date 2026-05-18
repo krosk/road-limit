@@ -460,17 +460,16 @@
     import { createState, applyGPS, smoothCompass, applyMotion } from './lib/state.js';
     import { computeTurnCard, segmentsGeoJSON, statusText, barState, badgeItems, debugTripletFeatures } from './lib/display.js';
 
-    // Show deployed timestamp from the file's Last-Modified header
-    fetch('index.html', { method: 'HEAD' })
-      .then(r => {
-        const lm = r.headers.get('Last-Modified');
-        if (lm) {
-          const d = new Date(lm);
-          document.getElementById('version-msg').textContent =
-            'Deployed ' + d.toISOString().slice(0, 16).replace('T', ' ') + ' UTC';
-        }
-      })
-      .catch(() => {});
+    // Show deployed timestamp + commit SHA
+    Promise.all([
+      fetch('index.html', { method: 'HEAD' }).then(r => r.headers.get('Last-Modified')).catch(() => null),
+      fetch('https://api.github.com/repos/krosk/road-limit/commits/main').then(r => r.json()).catch(() => null),
+    ]).then(([lm, commit]) => {
+      const dateStr = lm ? new Date(lm).toISOString().slice(0, 16).replace('T', ' ') + ' UTC' : '';
+      const shaStr  = commit?.sha ? commit.sha.slice(0, 7) : '';
+      const parts   = [dateStr && 'Deployed ' + dateStr, shaStr].filter(Boolean);
+      if (parts.length) document.getElementById('version-msg').textContent = parts.join(' · ');
+    });;
 
     // ── Config ─────────────────────────────────────────────────────────────────
     const CFG = { ...DEFAULT_CFG };
