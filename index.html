@@ -477,7 +477,7 @@
     const S = {
       lat: null, lon: null, speed: 0, heading: null, lastHeading: 0, accuracy: null,
       smoothLat: 0, smoothLong: 0, latG: 0, longG: 0,
-      beta: 0, gamma: 0,
+      beta: 0, gamma: 0, compassHeading: null,
       prevLat: null, prevLon: null,
     };
 
@@ -838,6 +838,9 @@
         const computed = bearingTo(S.prevLat, S.prevLon, lat, lon);
         S.heading = computed;
         S.lastHeading = computed;
+      } else if (S.compassHeading !== null) {
+        S.heading = S.compassHeading;
+        S.lastHeading = S.compassHeading;
       }
 
       S.prevLat = lat;
@@ -907,10 +910,29 @@
         window.addEventListener('devicemotion', handler);
       }
 
-      // Track orientation for gravity removal
+      // Track orientation for gravity removal and low-speed compass heading
+      let _compassRaf = false;
       window.addEventListener('deviceorientation', (e) => {
         if (e.beta  !== null) S.beta  = e.beta;
         if (e.gamma !== null) S.gamma = e.gamma;
+
+        // webkitCompassHeading on iOS is tilt-compensated; alpha on Android is raw azimuth
+        const compass = e.webkitCompassHeading != null
+          ? e.webkitCompassHeading
+          : (e.alpha != null ? (360 - e.alpha) % 360 : null);
+        if (compass === null) return;
+        S.compassHeading = compass;
+
+        // When stationary, rotate the map to match compass without waiting for GPS
+        if (posMode !== 'gps' || (S.speed ?? 0) >= CFG.minSpeedForHeading) return;
+        S.lastHeading = compass;
+        if (!_compassRaf) {
+          _compassRaf = true;
+          requestAnimationFrame(() => {
+            _compassRaf = false;
+            if (map) map.easeTo({ bearing: S.lastHeading, duration: 150 });
+          });
+        }
       });
     }
 
