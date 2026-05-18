@@ -17,25 +17,102 @@ npm run test:e2e        # Playwright — UI tests with mocked GPS and road data
 npm test                # both
 ```
 
-Tests must pass before every push. The unit tests run in under 1s.
+Tests must pass before every push. The unit tests run in well under 1s.
 
 ## Structure
 
 ```
-index.html              entry point, thin glue between browser APIs and lib/
+index.html              entry point — browser API wiring only, no logic
 lib/
-  geo.js                pure geo math (haversine, bearing, circumradius, …)
-  road.js               road matching, lookahead, turn detection, badge logic
+  config.js             DEFAULT_CFG constants (imported by index.html)
+  geo.js                pure geo math (haversine, bearing, circumradius,
+                          ptAtDistance, bearingAtDistance, destPoint, …)
+  road.js               road matching, lookahead, turn detection,
+                          normaliseFeatures, corneringSpeed, …
   motion.js             accelerometer calibration (Option C rotation matrix)
+  state.js              pure state update functions (applyGPS, smoothCompass,
+                          applyMotion, createState)
+  display.js            pure display computation (computeCornerBadge,
+                          segmentLineColor, segmentsGeoJSON, statusText,
+                          barState, badgeItems, debugTripletFeatures)
 test/
-  geo.test.js           47 unit tests total across the three lib files
-  road.test.js
-  motion.test.js
+  geo.test.js           unit tests for lib/geo.js
+  road.test.js          unit tests for lib/road.js
+  motion.test.js        unit tests for lib/motion.js
+  state.test.js         unit tests for lib/state.js
+  display.test.js       unit tests for lib/display.js
+                        123 unit tests total across all lib files
 e2e/
-  dashboard.spec.js     Playwright: mocks GPS + queryRenderedFeatures
+  dashboard.spec.js     Playwright: mocks GPS + road features
   fixtures/             JSON road-feature fixtures for replay testing
 docs/adr/               architecture decision records
+mindmap.html            interactive function map (open in browser)
 ```
+
+## Module architecture
+
+All logic lives in `lib/`. `index.html` contains only:
+- Browser API wiring (MapLibre, Geolocation, Device Sensors)
+- DOM reads/writes
+- Event handlers that call lib functions and apply results to the DOM
+
+This means every decision — what the corner badge shows, what colour a
+segment gets, what the status line says, how GPS updates state — is a pure
+function in a lib module, unit-testable without a browser.
+
+### lib boundaries
+
+| Module | Depends on | Responsibility |
+|--------|-----------|----------------|
+| `geo.js` | nothing | distance, bearing, geometry math |
+| `road.js` | `geo.js` | road matching, BFS, turn detection, tile normalisation |
+| `motion.js` | nothing | accelerometer frame transforms, EMA |
+| `config.js` | nothing | default CFG values |
+| `state.js` | `geo.js`, `motion.js` | pure state update functions |
+| `display.js` | `road.js`, `geo.js` | compute what to display from state |
+
+### index.html inline functions (browser-coupled, not unit-tested)
+
+| Function | What it does |
+|----------|-------------|
+| `getRoadFeatures` | calls `queryRenderedFeatures`, pipes through `normaliseFeatures` |
+| `updateCarPosition` | moves MapLibre marker, calls `map.easeTo` |
+| `updateBadges` | creates/removes MapLibre `Marker` elements using `badgeItems` |
+| `updateSegmentOverlay` | calls `map.getSource().setData()` using `segmentsGeoJSON` |
+| `updateDebugTriplets` | calls `map.getSource().setData()` using `debugTripletFeatures` |
+| `renderDashboard` | orchestrates all of the above |
+| `renderGMeters` | updates G-bar DOM using `barState` |
+| `initMap` | MapLibre setup, sources, layers, drag handler |
+| `initGPS` | `navigator.geolocation.watchPosition` |
+| `initMotion` | `devicemotion` / `deviceorientation` / `deviceorientationabsolute` |
+| `onPos` | GPS callback — calls `applyGPS`, then `renderDashboard` |
+| `applyManualPos` | reads SET-mode inputs, mutates state |
+| `setPosInputs` | writes position to DOM inputs |
+| `setStatus` | writes status line to DOM |
+| `setBar` | updates G-bar DOM using `barState` |
+
+## External API dependencies
+
+| Dependency | Used for | Called in |
+|-----------|---------|-----------|
+| **MapLibre GL JS** (CDN `<script>`) | map rendering, tile fetch, feature query, markers, overlay sources | `initMap`, `getRoadFeatures`, `updateCarPosition`, `updateBadges`, `updateSegmentOverlay`, `updateDebugTriplets` |
+| **OpenFreeMap CDN** | vector tile style (`liberty`) | `initMap` |
+| **Geolocation API** | GPS position | `initGPS` → `onPos` |
+| **Device Sensors API** | accelerometer (`devicemotion`), orientation (`deviceorientation`), absolute compass (`deviceorientationabsolute`) | `initMotion` |
+| **Fetch API** | `HEAD index.html` for deployed timestamp | startup |
+
+### queryRenderedFeatures viewport constraint
+
+`queryRenderedFeatures` only returns features currently drawn in the
+WebGL canvas. Consequences:
+- Road data is viewport-bound: features outside the visible area are not
+  returned even if their tiles are loaded.
+- At zoom 16 / pitch 60° the viewport extends well past the 120 m
+  lookahead, so in practice the constraint is not hit.
+- Tiles load asynchronously after a position change; `getRoadFeatures`
+  returns `[]` until the `idle` event fires.
+- There is no server-side or headless equivalent; a browser with a
+  rendered MapLibre canvas is required to call `queryRenderedFeatures`.
 
 ## Key design decisions (see docs/adr/ for full rationale)
 
@@ -65,10 +142,15 @@ docs/adr/               architecture decision records
 - **SET mode drag heading**: dragging the map in SET mode computes bearing
   from consecutive center positions (2 m threshold) and sets `S.heading`
   automatically.
+- **normaliseFeatures**: `queryRenderedFeatures` returns `MultiLineString`
+  for roads that cross tile boundaries. `normaliseFeatures` in `lib/road.js`
+  expands these into individual `LineString` features before any lib code
+  sees them. This is a pure function and is unit-tested independently.
 
 ## Configuration
 
-All tunable constants are in `CFG` at the top of `index.html`:
+All tunable constants are defined in `lib/config.js` as `DEFAULT_CFG` and
+spread into a mutable local `CFG` at the top of `index.html`:
 
 | Key | Default | Meaning |
 |-----|---------|---------|
@@ -93,10 +175,33 @@ the bottom panel for live tuning without reloading.
   - G-force bars (lateral / longitudinal) — always visible
   - Threshold slider (lateral G limit)
   - GPS/SET toggle + position inputs (Lon, Lat, Hdg°) + Apply
-  - Dist m (road match threshold) + lookahead distance + DBG toggle
+  - Dist m (road match threshold) + lookahead distance + DBG toggle + CPY button
   - Status line + deployed timestamp
 - **Map overlays**: colored road segments ahead (green/orange/red by cornering
   speed vs current speed); plain-text speed badges at each curve node.
+
+## Capturing real-world road fixtures
+
+The **CPY** button in the bottom panel copies the current road topology to
+the clipboard as JSON (`window.__lastFeatures` after normalisation).
+
+Workflow for adding a fixture-based test for a real location:
+1. Open the app, switch to **SET** mode, drag the map to the target location.
+2. Wait for the status line to show a road count (tiles loaded).
+3. Press **CPY** — button flashes ✓ on success.
+4. Paste the JSON into `e2e/fixtures/<name>.json`.
+5. Write a test in `e2e/dashboard.spec.js` using `loadFixture('<name>')`.
+6. Provide the fixture JSON and expected behaviour to an agent to generate
+   the test, or write it directly using the existing fixture tests as a model.
+
+The fixture JSON is an array of GeoJSON `LineString` features in the same
+shape returned by `normaliseFeatures`. It plugs directly into `segmentsAhead`
+for unit tests, or into `mockFeatures` for e2e tests.
+
+**CPY feedback:**
+- **✓** — copied successfully
+- **—** — no features loaded yet
+- **✗** — clipboard API refused (requires HTTPS or localhost)
 
 ## Test hooks (for Playwright and manual debugging)
 
@@ -104,8 +209,8 @@ the bottom panel for live tuning without reloading.
 - `window.__setMockFeatures(features)` / `window.__mockFeatures` — inject
   fake GeoJSON LineString features, bypassing `queryRenderedFeatures`.
 - `window.__lastFeatures` — always holds the last result from
-  `queryRenderedFeatures` (after MultiLineString normalisation). Copy from
-  DevTools console to build test fixtures for a specific location.
+  `queryRenderedFeatures` (after normalisation). Also accessible via the
+  **CPY** button.
 
 ## Debug mode (DBG)
 
@@ -139,10 +244,12 @@ In **GPS** mode the fields are read-only and show the live GPS position.
   from `deviceorientation` would be the equivalent but is currently unused.
 - `queryRenderedFeatures` returns clipped geometries at tile boundaries;
   roads crossing a tile edge arrive as MultiLineString — normalised to
-  individual LineStrings in `getRoadFeatures` before any lib code sees them.
+  individual LineStrings by `normaliseFeatures` in `lib/road.js`.
 - `queryRenderedFeatures` returns 0 features while tiles are still loading
   (e.g. immediately after a drag in SET mode). The `idle` event triggers a
   re-render once tiles settle.
+- `queryRenderedFeatures` is viewport-bound: no headless or server-side
+  equivalent exists. Fixture capture requires a browser session.
 - Overlays do not update during map drag (only on `idle`) to avoid flicker
   from sparse `queryRenderedFeatures` results mid-pan.
 - The first collected node of each BFS segment (`pts[0]`) is excluded from
