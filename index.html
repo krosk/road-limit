@@ -564,6 +564,22 @@
           },
           layout: { 'line-cap': 'round', 'line-join': 'round' },
         });
+
+        map.addSource('debug-connectors', {
+          type: 'geojson',
+          data: { type: 'FeatureCollection', features: [] },
+        });
+        map.addLayer({
+          id: 'debug-connectors-line',
+          type: 'line',
+          source: 'debug-connectors',
+          paint: {
+            'line-color': ['get', 'color'],
+            'line-width': 2,
+            'line-opacity': 0.9,
+          },
+          layout: { 'line-cap': 'round', 'line-join': 'round' },
+        });
       });
 
       // Blue car dot marker
@@ -614,10 +630,24 @@
       return pts[pts.length - 1];
     }
 
+    // Road bearing (degrees) at cumulative distance d along a polyline.
+    function bearingAtDistance(pts, d) {
+      let acc = 0;
+      for (let i = 1; i < pts.length; i++) {
+        const seg = haversine(pts[i - 1][1], pts[i - 1][0], pts[i][1], pts[i][0]);
+        if (acc + seg >= d || i === pts.length - 1) {
+          return bearingTo(pts[i - 1][1], pts[i - 1][0], pts[i][1], pts[i][0]);
+        }
+        acc += seg;
+      }
+      return 0;
+    }
+
     function updateBadges(segments, currentSpeedKmh) {
       if (!map) return;
       for (const m of badgeMarkers) m.remove();
       badgeMarkers = [];
+      const connectorFeatures = [];
 
       for (const seg of segments) {
         if (seg.isBehind) continue;
@@ -627,15 +657,37 @@
 
           const el = document.createElement('div');
           el.className = 'speed-badge';
-          if (currentSpeedKmh > limit) el.classList.add('over');
+          const over = currentSpeedKmh > limit;
+          if (over) el.classList.add('over');
           el.textContent = String(limit);
 
-          const lngLat = ptAtDistance(seg.pts, turn.distance);
+          const nodePos = ptAtDistance(seg.pts, turn.distance);
+          let badgePos = nodePos;
+
+          if (debugMode) {
+            const roadBear = bearingAtDistance(seg.pts, turn.distance);
+            const perpBear = (roadBear + 90) % 360;
+            const [offLat, offLon] = destPoint(nodePos[1], nodePos[0], perpBear, 40);
+            badgePos = [offLon, offLat];
+            connectorFeatures.push({
+              type: 'Feature',
+              geometry: { type: 'LineString', coordinates: [nodePos, badgePos] },
+              properties: { color: over ? '#e33' : '#3a9' },
+            });
+          }
+
           const marker = new window.maplibregl.Marker({ element: el })
-            .setLngLat(lngLat)
+            .setLngLat(badgePos)
             .addTo(map);
           badgeMarkers.push(marker);
         }
+      }
+
+      if (map.getSource('debug-connectors')) {
+        map.getSource('debug-connectors').setData({
+          type: 'FeatureCollection',
+          features: connectorFeatures,
+        });
       }
     }
 
