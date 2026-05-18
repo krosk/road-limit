@@ -58,9 +58,10 @@ docs/adr/               architecture decision records
   collected node (`pts[0]`) is always an endpoint and can never receive a badge.
 - **Map heading**: above `CFG.minSpeedForHeading` (5 km/h) the map rotates
   to match GPS heading. Below that, `deviceorientationabsolute` alpha is
-  smoothed with a circular EMA (α = 0.1) and used to rotate the map only —
-  `S.lastHeading` (which drives BFS road matching) is not updated from the
-  compass, so the road overlay stays stable.
+  smoothed with a circular EMA (α = 0.1), corrected by +180° for the current
+  phone mount, and applied via `updateCarPosition` at 2 Hz — identical code
+  path to a GPS heading update, so `S.heading` and `S.lastHeading` are both
+  updated and the road overlay follows the compass.
 - **SET mode drag heading**: dragging the map in SET mode computes bearing
   from consecutive center positions (2 m threshold) and sets `S.heading`
   automatically.
@@ -81,6 +82,21 @@ All tunable constants are in `CFG` at the top of `index.html`:
 
 Both `roadMatchMaxDist` and `lookahead` are also exposed as number inputs in
 the bottom panel for live tuning without reloading.
+
+## UI layout
+
+- **Top-left overlay**: speed (km/h), road name, map bearing + raw abs compass
+  (`↑ X°  ·  Y°` where X = screen-top direction, Y = raw device compass).
+- **Top-right overlay**: large corner badge — cornering speed limit of the
+  nearest upcoming turn, with distance. Red background when over the limit.
+- **Bottom panel** (collapsible via `⌄` chevron):
+  - G-force bars (lateral / longitudinal) — always visible
+  - Threshold slider (lateral G limit)
+  - GPS/SET toggle + position inputs (Lon, Lat, Hdg°) + Apply
+  - Dist m (road match threshold) + lookahead distance + DBG toggle
+  - Status line + deployed timestamp
+- **Map overlays**: colored road segments ahead (green/orange/red by cornering
+  speed vs current speed); plain-text speed badges at each curve node.
 
 ## Test hooks (for Playwright and manual debugging)
 
@@ -105,31 +121,32 @@ The bottom panel has a **DBG** toggle. When active:
 
 The bottom panel has a GPS/SET toggle. In **SET** mode:
 - The three inputs (Lon, Lat, Hdg°) become editable.
-- Dragging the map updates the position live.
+- Dragging the map updates the position live and infers heading from drag
+  direction (bearing between consecutive center positions, 2 m threshold).
 - Pressing **Apply** jumps the car dot and redraws the overlay.
 - GPS updates are ignored until toggled back to **GPS**.
 
 In **GPS** mode the fields are read-only and show the live GPS position.
-Dragging the map in SET mode automatically infers heading from the drag
-direction (bearing between consecutive center positions, 2 m threshold).
 
 ## Known limitations
 
 - OSM speed limits are sparse on minor roads; badges show cornering speed
   estimate (from geometry) when `maxspeed` tag is absent.
-- GPS heading unreliable below ~5 km/h; compass takes over for map
-  rotation but `S.lastHeading` stays frozen at last GPS heading, so BFS
-  direction may be wrong if the car reverses or turns sharply while stopped.
+- GPS heading unreliable below ~5 km/h; `deviceorientationabsolute` takes
+  over (2 Hz, circular EMA, +180° mount correction). The 180° offset is
+  specific to the current phone mount — adjust if mount orientation changes.
 - `deviceorientationabsolute` not available on iOS; `webkitCompassHeading`
   from `deviceorientation` would be the equivalent but is currently unused.
 - `queryRenderedFeatures` returns clipped geometries at tile boundaries;
   roads crossing a tile edge arrive as MultiLineString — normalised to
   individual LineStrings in `getRoadFeatures` before any lib code sees them.
-- Turn speed formula assumes flat road; no grade correction.
-- Insurer threshold (0.3g default) is a guess until confirmed.
 - `queryRenderedFeatures` returns 0 features while tiles are still loading
   (e.g. immediately after a drag in SET mode). The `idle` event triggers a
   re-render once tiles settle.
+- Overlays do not update during map drag (only on `idle`) to avoid flicker
+  from sparse `queryRenderedFeatures` results mid-pan.
 - The first collected node of each BFS segment (`pts[0]`) is excluded from
   turn detection; no badge appears there even if the geometry is curved.
   In DBG mode a cyan ▶ marker identifies this node.
+- Turn speed formula assumes flat road; no grade correction.
+- Insurer threshold (0.3g default) is a guess until confirmed.
