@@ -553,11 +553,11 @@
     let badgeMarkers = [];
 
     function getRoadFeatures() {
-      if (_mockFeatures !== null) return _mockFeatures;
-      if (!map || !map.isStyleLoaded() || roadLayers.length === 0) return [];
+      const useMock = _mockFeatures !== null;
+      if (!map || !map.isStyleLoaded() || roadLayers.length === 0) {
+        return useMock ? _mockFeatures : [];
+      }
       const raw = map.queryRenderedFeatures({ layers: roadLayers });
-      const f = normaliseFeatures(raw);
-      window.__lastFeatures = f;
       window.__lastRawCount = raw.length;
       window.__lastLayersQueried = roadLayers.length;
 
@@ -587,6 +587,9 @@
         window.__lastRawLayerSummary = null;
       }
 
+      if (useMock) return _mockFeatures;
+      const f = normaliseFeatures(raw);
+      window.__lastFeatures = f;
       return f;
     }
 
