@@ -619,6 +619,11 @@
         const el = document.getElementById('map-bearing');
         const abs = el.dataset.abs ?? '—';
         el.textContent = `↑ ${Math.round(b)}°  ·  ${abs}°`;
+        if (posMode === 'manual') {
+          S.heading = b;
+          S.lastHeading = b;
+          document.getElementById('pos-hdg').value = Math.round(b);
+        }
       };
       map.on('rotate', updateMapBearing);
       map.on('load', updateMapBearing);
