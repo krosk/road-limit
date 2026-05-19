@@ -378,18 +378,37 @@ test('firstTurnAhead: track branching off a tertiary road does not suppress turn
   assert.strictEqual(result.direction, 'left');
 });
 
-test('firstTurnAhead: junction (2 forward segments) → null', () => {
-  // Branch road with second node ~89 m away — fits within 120 m budget
-  const branchFeature = {
+test('firstTurnAhead: track with more pts in same bearing group does not evict main road', () => {
+  // Reproduces the roads_14 pattern: a track branches at a junction node on a
+  // tertiary road and travels in a similar direction (≈25° difference), falling
+  // into the same bearing group.  The track has more pts (4) than the tertiary
+  // stub (3) but must NOT replace it.  The track is perfectly straight — if it
+  // were selected the turn card would return null; the tertiary has a genuine
+  // right bend so it returns a non-null result.
+  const tertiary = {
     type: 'Feature',
     geometry: { type: 'LineString', coordinates: [
-      [2.001, 48.0], [2.001, 48.0008],
+      [2.0, 48.001], [2.0, 48.0], [1.999, 47.999], [1.997, 47.998],
     ]},
-    properties: {},
+    properties: { class: 'tertiary' },
   };
-  const result = firstTurnAhead([leftTurnFeature, branchFeature], 2.0, 48.0, 90, 120, MAX_R, A, 50);
-  assert.strictEqual(result, null);
+  // Track branches at [2.0,48.0] (junction node), net bearing ≈198° (25° off
+  // tertiary's ≈225°) → joins the same direction group, more pts but straight.
+  const track = {
+    type: 'Feature',
+    geometry: { type: 'LineString', coordinates: [
+      [2.0, 48.0], [1.9993, 47.9986], [1.9986, 47.9972], [1.9979, 47.9958],
+      [1.9972, 47.9944], [1.9965, 47.993], [1.9958, 47.9916],
+    ]},
+    properties: { class: 'track' },
+  };
+  const result = firstTurnAhead([tertiary, track], 2.0, 48.001, 210, 500, MAX_R, A, 50);
+  // With old code (pts.length wins): track replaces tertiary → straight → null.
+  // With new code (class wins): tertiary kept → right bend detected → non-null.
+  assert.ok(result !== null, 'tertiary bend must be detected; track must not evict main road');
+  assert.strictEqual(result.direction, 'right', 'direction must come from tertiary geometry');
 });
+
 
 test('firstTurnAhead: short feature-boundary stub does not create spurious junction', () => {
   // Two features share a node. The car is matched to feature A between nodes 1 and 2
@@ -422,12 +441,6 @@ test('firstTurnAhead: short feature-boundary stub does not create spurious junct
     ]},
     properties: {},
   };
-  // Car exactly on shortStub segment [node1→node2], heading south (180°).
-  // Segment bears NNE so forward=false, segIdx=1.
-  // Walk backward: [node1, node0] = 2 pts, ~23 m — cannot create a direction group.
-  // longCont 7-pt walk has net bearing ~165° and length >30 m — creates the group.
-  // 23 m stub (204°) joins that group within the 45° tolerance (angDiff=39°).
-  // 1 group → turn detection runs on longCont's pts → right turn is detected.
   const result = firstTurnAhead([shortStub, longContinuation], 2.00025, 48.0003, 180, 500, MAX_R, A, 50);
   assert.ok(result !== null, 'short stub should join the longer segment\'s group, not create a spurious junction');
 });
@@ -455,6 +468,19 @@ test('firstTurnAhead: backward BFS branch does not suppress turn card', () => {
   const result = firstTurnAhead([southToWestRoad, northBranch], 2.0, 48.002, 180, 500, MAX_R, A, 50);
   assert.ok(result !== null, 'northward branch (>90° from heading) should be filtered; turn card must show');
   assert.strictEqual(result.direction, 'right');
+});
+
+test('firstTurnAhead: junction (2 forward segments) → null', () => {
+  // Branch road with second node ~89 m away — fits within 120 m budget
+  const branchFeature = {
+    type: 'Feature',
+    geometry: { type: 'LineString', coordinates: [
+      [2.001, 48.0], [2.001, 48.0008],
+    ]},
+    properties: {},
+  };
+  const result = firstTurnAhead([leftTurnFeature, branchFeature], 2.0, 48.0, 90, 120, MAX_R, A, 50);
+  assert.strictEqual(result, null);
 });
 
 test('firstTurnAhead: distanceToStart > 0 for non-immediate turn', () => {

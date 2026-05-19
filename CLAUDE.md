@@ -46,7 +46,7 @@ test/
   motion.test.js        unit tests for lib/motion.js
   state.test.js         unit tests for lib/state.js
   display.test.js       unit tests for lib/display.js
-                        137 unit tests total across all lib files
+                        138 unit tests total across all lib files
 e2e/
   dashboard.spec.js     Playwright: mocks GPS + road features
   fixtures/             JSON road-feature fixtures for replay testing
@@ -172,6 +172,9 @@ WebGL canvas. Consequences:
   road — field tracks and footpaths that happen to branch off are not genuine
   turn options. Only `dirGroups.length !== 1` — genuinely distinct driveable
   directions — suppresses the turn card.
+  Within a direction group, a minor-road segment can never evict a main-road
+  segment even if it has more pts — road class takes priority over pts count
+  when selecting the representative segment for turn computation.
 
 ## Configuration
 
