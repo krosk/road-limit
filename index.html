@@ -106,7 +106,6 @@
       font-size: 12px;
       color: #aaa;
       margin-top: 4px;
-      min-height: 16px;
     }
 
     /* Bottom panel */
@@ -822,12 +821,15 @@
         ? matchRoad(features, S.lon, S.lat, S.heading)
         : null;
 
+      const roadNameEl = document.getElementById('road-name');
       if (match) {
         const props = match.feature.properties || {};
         const name = props.name || props.ref || '';
-        document.getElementById('road-name').textContent = name;
+        roadNameEl.textContent = name;
+        roadNameEl.style.display = name ? '' : 'none';
       } else {
-        document.getElementById('road-name').textContent = '';
+        roadNameEl.textContent = '';
+        roadNameEl.style.display = 'none';
       }
 
       // Segments ahead
@@ -943,7 +945,8 @@
       panelExpanded = !panelExpanded;
       const show = panelExpanded ? '' : 'none';
       document.getElementById('panel-lower').style.display = show;
-      document.getElementById('road-name').style.display = show;
+      const rnEl = document.getElementById('road-name');
+      rnEl.style.display = panelExpanded && rnEl.textContent ? '' : 'none';
       document.getElementById('map-bearing').style.display = show;
       document.getElementById('panel-toggle-btn').textContent = panelExpanded ? '⌄' : '⌃';
     });
