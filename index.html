@@ -516,6 +516,12 @@
         document.getElementById(id).readOnly = !isManual;
       });
       document.getElementById('pos-apply').disabled = !isManual;
+      if (isManual && map) {
+        const bearing = ((map.getBearing() % 360) + 360) % 360;
+        S.heading = bearing;
+        S.lastHeading = bearing;
+        document.getElementById('pos-hdg').value = Math.round(bearing);
+      }
     });
 
     document.getElementById('pos-apply').addEventListener('click', () => {
