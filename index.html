@@ -280,6 +280,7 @@
     #panel-toggle-row {
       display: flex;
       justify-content: center;
+      align-items: center;
       margin: 6px 0 2px;
     }
 
@@ -291,6 +292,18 @@
       line-height: 1;
       cursor: pointer;
       padding: 0 24px;
+    }
+
+    #fullscreen-btn {
+      position: absolute;
+      right: 16px;
+      background: transparent;
+      border: none;
+      color: #444;
+      font-size: 18px;
+      line-height: 1;
+      cursor: pointer;
+      padding: 0;
     }
 
     /* Debug: BFS start-node marker */
@@ -414,6 +427,7 @@
 
     <div id="panel-toggle-row">
       <button id="panel-toggle-btn">⌄</button>
+      <button id="fullscreen-btn" title="Toggle fullscreen">⛶</button>
     </div>
 
     <div id="panel-lower">
@@ -950,6 +964,20 @@
       document.getElementById('map-bearing').style.display = show;
       document.getElementById('panel-toggle-btn').textContent = panelExpanded ? '⌄' : '⌃';
     });
+
+    // ── Fullscreen toggle ─────────────────────────────────────────────────────
+    const fsBtn = document.getElementById('fullscreen-btn');
+    const updateFsBtn = () => {
+      fsBtn.textContent = document.fullscreenElement ? '⊡' : '⛶';
+    };
+    fsBtn.addEventListener('click', () => {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(() => {});
+      } else {
+        document.exitFullscreen().catch(() => {});
+      }
+    });
+    document.addEventListener('fullscreenchange', updateFsBtn);
 
     // ── Debug toggle ───────────────────────────────────────────────────────────
     document.getElementById('dbg-toggle').addEventListener('click', () => {
