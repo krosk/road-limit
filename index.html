@@ -31,11 +31,10 @@
     }
 
     #turn-card-arrow {
-      font-size: 64px;
-      font-weight: 700;
-      line-height: 1;
       color: #888;
-      margin-right: 4px;
+      margin-right: 6px;
+      display: inline-flex;
+      align-items: center;
     }
 
     #turn-card-speed {
@@ -492,6 +491,10 @@
     // ── Config ─────────────────────────────────────────────────────────────────
     const CFG = { ...DEFAULT_CFG };
 
+    // ── Turn arrow SVGs ────────────────────────────────────────────────────────
+    const SVG_TURN_RIGHT = `<svg viewBox="0 0 48 48" width="52" height="52"><path d="M16,46 L16,24 A14,14 0 0,1 30,10" stroke="currentColor" stroke-width="5" fill="none" stroke-linecap="round" stroke-linejoin="round"/><polygon points="39,10 27,4 27,16" fill="currentColor"/></svg>`;
+    const SVG_TURN_LEFT  = `<svg viewBox="0 0 48 48" width="52" height="52"><path d="M32,46 L32,24 A14,14 0 0,0 18,10" stroke="currentColor" stroke-width="5" fill="none" stroke-linecap="round" stroke-linejoin="round"/><polygon points="9,10 21,4 21,16" fill="currentColor"/></svg>`;
+
     // ── State ──────────────────────────────────────────────────────────────────
     const S = createState();
 
@@ -903,7 +906,7 @@
       const turnCardEl = document.getElementById('turn-card');
       if (card !== null) {
         turnCardEl.style.display = 'block';
-        document.getElementById('turn-card-arrow').textContent = card.direction === 'right' ? '→' : '←';
+        document.getElementById('turn-card-arrow').innerHTML = card.direction === 'right' ? SVG_TURN_RIGHT : SVG_TURN_LEFT;
         const speedEl = document.getElementById('turn-card-speed');
         speedEl.textContent = String(card.minSpeed);
         speedEl.classList.toggle('over', card.isOver);
