@@ -528,6 +528,48 @@ test('firstTurnAhead: minSpeed > 0', () => {
   assert.ok(result.minSpeed !== null && result.minSpeed > 0);
 });
 
+test('firstTurnAhead: service road spur in same bearing group does not evict primary road (roads_28)', () => {
+  // Reproduces roads_28: a service road spur connects near the bridge junction,
+  // travels in roughly the same direction as the highway, and has MORE pts than
+  // the primary bridge.  Before the fix (service not in MINOR_CLASSES), the
+  // service road's tight curve (low minSpeed) would replace the primary road's
+  // gentler curve.  After the fix, primary always wins.
+  const primary = {
+    type: 'Feature',
+    geometry: { type: 'LineString', coordinates: [
+      // gentle right arc heading NNE then NE (large radius → high minSpeed)
+      [2.0, 48.0],
+      [2.0001, 48.0003],
+      [2.0003, 48.0006],
+      [2.0006, 48.0009],
+      [2.001,  48.0011],
+      [2.0015, 48.0012],
+    ]},
+    properties: { class: 'primary' },
+  };
+  // Service road branches from near the junction with more pts and a tight S-curve
+  const service = {
+    type: 'Feature',
+    geometry: { type: 'LineString', coordinates: [
+      [2.0002, 48.0003],  // near junction — within 25 m of primary coords
+      [2.0004, 48.0006],
+      [2.0007, 48.0008],
+      [2.001,  48.0007],  // tight right turn here
+      [2.0013, 48.0008],
+      [2.0015, 48.001],
+      [2.0016, 48.0013],
+    ]},
+    properties: { class: 'service' },
+  };
+  const result = firstTurnAhead([primary, service], 2.0, 48.0, 20, 500, MAX_R, A, 50);
+  // Service road must not evict primary: result must reflect primary's geometry.
+  // Primary's gentle arc gives a much higher minSpeed than a tight service-road curve.
+  assert.ok(result !== null, 'turn card must be shown');
+  // The primary road's minSpeed must be above the service road's tight corner speed.
+  // This catches regression: service road spur used instead of primary.
+  assert.ok(result.minSpeed > 30, `primary road must dominate; got minSpeed=${result.minSpeed}`);
+});
+
 // ── normaliseFeatures ─────────────────────────────────────────────────────────
 
 const coords = [[2, 48], [2.001, 48]];

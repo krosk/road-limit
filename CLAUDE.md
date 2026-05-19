@@ -171,11 +171,11 @@ WebGL canvas. Consequences:
   are grouped by net bearing (30° tolerance). Groups within 30° of each
   other are the same physical road split across OSM features (tile edges,
   layer duplicates). After grouping, direction groups whose `roadClass` is
-  in `MINOR_CLASSES` (`track`, `path`, `footway`, `cycleway`, `steps`,
-  `bridleway`) are discarded when at least one group is on a proper driveable
-  road — field tracks and footpaths that happen to branch off are not genuine
-  turn options. Only `dirGroups.length !== 1` — genuinely distinct driveable
-  directions — suppresses the turn card.
+  in `MINOR_CLASSES` (`service`, `track`, `path`, `footway`, `cycleway`,
+  `steps`, `bridleway`) are discarded when at least one group is on a proper
+  driveable road — service spurs, field tracks and footpaths that happen to
+  branch off are not genuine turn options. Only `dirGroups.length !== 1` —
+  genuinely distinct driveable directions — suppresses the turn card.
   Within a direction group, a minor-road segment can never evict a main-road
   segment even if it has more pts — road class takes priority over pts count
   when selecting the representative segment for turn computation.
