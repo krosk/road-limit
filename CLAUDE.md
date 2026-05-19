@@ -50,7 +50,7 @@ test/
   motion.test.js        unit tests for lib/motion.js
   state.test.js         unit tests for lib/state.js
   display.test.js       unit tests for lib/display.js
-                        138 unit tests total across all lib files
+                        140 unit tests total across all lib files
 e2e/
   dashboard.spec.js     Playwright: mocks GPS + road features
   fixtures/             JSON road-feature fixtures for replay testing
@@ -84,7 +84,7 @@ function in a lib module, unit-testable without a browser.
 
 | Function | What it does |
 |----------|-------------|
-| `getRoadFeatures` | calls `queryRenderedFeatures`, pipes through `normaliseFeatures` |
+| `getRoadFeatures` | always calls `queryRenderedFeatures` to update raw diagnostic globals; returns mock features when set (Playwright only), otherwise returns `normaliseFeatures(raw)` |
 | `updateCarPosition` | moves MapLibre marker, calls `map.easeTo` |
 | `updateBadges` | creates/removes MapLibre `Marker` elements using `badgeItems` |
 | `updateSegmentOverlay` | calls `map.getSource().setData()` using `segmentsGeoJSON` |
@@ -136,8 +136,9 @@ WebGL canvas. Consequences:
   `lib/road.js` runs `segmentsAhead` with the standard lookahead, returns null
   for junctions (multiple forward segments) or no turn within lookahead.
   `computeTurnCard` in `lib/display.js` formats it for display. Card shows
-  direction arrow (← / →), min cornering speed circle, distance and ETA to arc
-  start. Junction suppression: if BFS finds >1 forward segment, no card shown.
+  an SVG curved navigation arrow (left/right), min cornering speed, distance
+  and ETA to arc start. Arrow turns red when over limit. Junction suppression:
+  if BFS finds >1 genuinely distinct driveable direction, no card shown.
 - **segmentsAhead algorithm**: BFS over the connected road graph up to
   `CFG.lookahead` metres ahead only (lookBehind = 0). Starts from the
   matched road, explores both directions at every junction node, tracks
@@ -187,30 +188,35 @@ spread into a mutable local `CFG` at the top of `index.html`:
 
 | Key | Default | Meaning |
 |-----|---------|---------|
-| `lateralGLimit` | 0.30 g | harsh cornering threshold |
+| `lateralGLimit` | 0.50 g | harsh cornering threshold |
 | `longGLimit` | 0.40 g | harsh braking/acceleration threshold |
-| `aThreshold` | 0.30 × 9.81 m/s² | lateral acceleration for turn speed formula |
+| `aThreshold` | 0.50 × 9.81 m/s² | lateral acceleration for turn speed formula |
 | `lookahead` | 120 m | road scan distance ahead of the car |
 | `roadMatchMaxDist` | 30 m | max distance from car to nearest road to start BFS |
 
-`aThreshold` should be tuned once the insurer's exact threshold is known.
+`lateralGLimit` and `aThreshold` are kept in sync (both at 0.50 g). Tune once
+the insurer's exact threshold is confirmed.
 
 Both `roadMatchMaxDist` and `lookahead` are also exposed as number inputs in
 the bottom panel for live tuning without reloading.
 
 ## UI layout
 
-- **Top-left overlay**: speed (km/h), road name, map bearing + raw abs compass
-  (`↑ X°  ·  Y°` where X = screen-top direction, Y = raw device compass).
-- **Top-right overlay**: turn summary card — direction arrow (← / →), min
-  cornering speed circle, distance and ETA to arc start. Red when over limit.
-  Hidden when no turn within lookahead or when approaching a junction.
-- **Bottom panel** (collapsible via `⌄` chevron):
-  - G-force bars (lateral / longitudinal) — always visible
+- **Top-left overlay**: speed (km/h), road name (hidden when empty), map bearing
+  + raw abs compass (`↑ X°  ·  Y°` where X = screen-top direction, Y = raw
+  device compass).
+- **Top-right overlay**: turn summary card — SVG curved navigation arrow
+  (white, left/right), min cornering speed (red when over limit), distance and
+  ETA to arc start. Hidden when no turn within lookahead or at a junction.
+- **Bottom panel**: contains all controls; shown/hidden by the `▼`/`▲` button.
+  - G-force bars (lateral / longitudinal)
   - Threshold slider (lateral G limit)
   - GPS/SET toggle + position inputs (Lon, Lat, Hdg°) + Apply
-  - Dist m (road match threshold) + lookahead distance + DBG toggle + CPY button
+  - Dist m (road match threshold) + lookahead distance + DBG toggle + CPY + LDR
   - Status line + deployed timestamp
+- **Floating buttons** (bottom-right corner, always visible):
+  - `▼`/`▲` — toggle bottom panel visibility
+  - `⛶`/`⊡` — toggle fullscreen
 - **Map overlays**: colored road segments ahead (green/orange/red by cornering
   speed vs current speed); plain-text speed badges at each curve node.
 
@@ -229,20 +235,27 @@ metadata and the current road topology.
     "position": { "lon": 2.348, "lat": 48.853, "heading": 90, "accuracy": 5 },
     "speed": 50,
     "map": { "zoom": 16, "pitch": 60, "bearing": 90 },
-    "cfg": { "lookahead": 120, "roadMatchMaxDist": 30, "aThreshold": 2.943 },
+    "cfg": { "lookahead": 120, "roadMatchMaxDist": 30, "aThreshold": 4.905 },
     "match": { "dist": 8, "road": "Rue de Rivoli", "class": "primary" },
     "segments": { "forward": 1, "behind": 0 },
-    "turnReason": null,
+    "forwardClasses": [6, 3],     // pts.length of each forward BFS segment (NOT road class)
+    "turnReason": null,           // "no match" | "junction" | "straight" | null
     "turnCard": { ... },
-    "rawCount": 42,
-    "layersQueried": 18,
-    "rawMinDist": 5,
+    "rawCount": 42,               // raw queryRenderedFeatures count (before normalisation)
+    "layersQueried": 18,          // number of road layer IDs passed to queryRenderedFeatures
+    "rawMinDist": 5,              // metres from car to nearest raw feature coordinate
     "rawLayerSummary": { "road_primary": 5, "road_primary_casing": 5, "road_secondary": 120 }
+                                  // per-layer minimum distance to car (metres)
   },
   "features": [ /* GeoJSON LineString features as returned by normaliseFeatures,
                    each annotated with _distToCar (metres, min distance to car) */ ]
 }
 ```
+
+`rawCount` and `rawMinDist` are the most useful diagnostic fields: `rawCount` tells
+you how many features the tile engine returned before deduplication, and `rawMinDist`
+tells you the distance to the nearest raw road coordinate — if this is large (>30 m)
+the car is genuinely off-road or tiles haven't loaded for that area.
 
 `loadFixture` in `dashboard.spec.js` and `mockFeatures` both accept either
 format: a bare array of features, or `{ meta, features }`.
@@ -289,14 +302,25 @@ repeatedly (useful for before/after comparison after a code change).
 
 `index.html` exposes:
 - `window.__setMockFeatures(features)` / `window.__mockFeatures` — inject
-  fake GeoJSON LineString features, bypassing `queryRenderedFeatures`.
-- `window.__lastFeatures` — always holds the last result from
-  `queryRenderedFeatures` (after normalisation). Downloaded by the **CPY**
-  button.
-- `window.__lastDiag` — snapshot of diagnostic state written at the end of
-  every `renderDashboard()` call. Shape matches the `meta` field in the CPY
-  download. Useful in DevTools to understand why a turn card is/isn't shown:
-  check `__lastDiag.turnReason`, `__lastDiag.segments`, `__lastDiag.match`.
+  fake GeoJSON LineString features for Playwright e2e tests. When set,
+  `getRoadFeatures()` returns these instead of calling `normaliseFeatures`,
+  but `queryRenderedFeatures` still runs to keep the raw diagnostic globals
+  up to date. **LDR does not use this mechanism** — it restores position only
+  and lets the real map tiles supply features.
+- `window.__lastFeatures` — last normalised feature array from
+  `queryRenderedFeatures`. Downloaded by the **CPY** button.
+- `window.__lastRawCount` / `window.__lastLayersQueried` / `window.__lastRawMinDist`
+  / `window.__lastRawLayerSummary` — raw diagnostic globals updated on every
+  `getRoadFeatures()` call. Copied into `__lastDiag` and the CPY payload.
+- `window.__lastDiag` — full diagnostic snapshot written at the end of every
+  `renderDashboard()` call. Shape matches the `meta` field in the CPY download.
+  Key fields for debugging why the turn card is/isn't shown:
+  - `turnReason` — `"no match"` / `"junction"` / `"straight"` / `null` (card shown)
+  - `segments.forward` — number of forward BFS segments found
+  - `forwardClasses` — `pts.length` of each forward segment (proxy for how much
+    road BFS collected per branch)
+  - `match.dist` — metres from car to nearest road; if > `roadMatchMaxDist`, no BFS
+  - `rawMinDist` — metres to nearest raw tile coordinate; large value means tile gap
 
 ## Debug mode (DBG)
 
@@ -344,4 +368,4 @@ In **GPS** mode the fields are read-only and show the live GPS position.
   turn detection; no badge appears there even if the geometry is curved.
   In DBG mode a cyan ▶ marker identifies this node.
 - Turn speed formula assumes flat road; no grade correction.
-- Insurer threshold (0.3g default) is a guess until confirmed.
+- Insurer threshold (0.5g default) is a working assumption until confirmed.
