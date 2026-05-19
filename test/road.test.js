@@ -300,7 +300,40 @@ test('segmentsAhead: backward BFS junction branch filtered when heading provided
     `Without heading filter expected ≥2, got ${segsWithoutHeading.length}`);
 });
 
-// ── firstTurnAhead ─────────────────────────────────────────────────────────────
+test('segmentsAhead: BFS propagates when car is at a feature endpoint (2-coord feature boundary)', () => {
+  // Reproduces a bridge tile where the matched feature has only 2 coords and
+  // the car lands on the endpoint node. collectAhead yields 1 pt, so the old
+  // code skipped junction discovery and returned 0 segments.
+  //
+  // Layout (heading south, ~180°):
+  //   bridgeSegment: [north] → [junction]   (car is AT [junction], heading south)
+  //   continuation:  [junction] → [south1] → [south2] → [south3]
+  const lon = 2.0, lat = 48.001;          // car at the south end of the bridge
+  const bridgeSegment = {
+    type: 'Feature',
+    geometry: { type: 'LineString', coordinates: [
+      [2.0, 48.002],   // north end
+      [2.0, 48.001],   // junction node — car is here
+    ]},
+    properties: { class: 'primary' },
+  };
+  const continuation = {
+    type: 'Feature',
+    geometry: { type: 'LineString', coordinates: [
+      [2.0, 48.001],   // junction node
+      [2.0, 48.0007],
+      [2.0, 48.0004],
+      [2.0, 48.0],
+    ]},
+    properties: { class: 'primary' },
+  };
+  const segs = segmentsAhead([bridgeSegment, continuation], lon, lat, 180, 500);
+  const forward = segs.filter(s => !s.isBehind);
+  assert.ok(forward.length >= 1,
+    `Expected ≥1 forward segment via BFS propagation, got ${forward.length}`);
+});
+
+
 
 const A = 0.30 * 9.81;
 const MAX_R = 2000;
