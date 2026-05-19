@@ -560,6 +560,33 @@
       window.__lastFeatures = f;
       window.__lastRawCount = raw.length;
       window.__lastLayersQueried = roadLayers.length;
+
+      // Per-layer min distance to car (for diagnostic payload)
+      if (S.lat !== null) {
+        let rawMinDist = Infinity;
+        const layerMin = {};
+        for (const feat of raw) {
+          const geom = feat.geometry;
+          if (!geom) continue;
+          const rings = geom.type === 'MultiLineString' ? geom.coordinates : [geom.coordinates];
+          let featMin = Infinity;
+          for (const ring of rings) {
+            for (const c of ring) {
+              const d = haversine(S.lat, S.lon, c[1], c[0]);
+              if (d < featMin) featMin = d;
+            }
+          }
+          if (featMin < rawMinDist) rawMinDist = featMin;
+          const lid = feat.layer?.id ?? 'unknown';
+          if (!(lid in layerMin) || featMin < layerMin[lid]) layerMin[lid] = Math.round(featMin);
+        }
+        window.__lastRawMinDist = Math.round(rawMinDist);
+        window.__lastRawLayerSummary = layerMin;
+      } else {
+        window.__lastRawMinDist = null;
+        window.__lastRawLayerSummary = null;
+      }
+
       return f;
     }
 
@@ -920,8 +947,10 @@
         forwardClasses: forward.map(s => s.pts?.length),
         turnReason,
         turnCard:      card,
-        rawCount:      window.__lastRawCount ?? null,
-        layersQueried: window.__lastLayersQueried ?? null,
+        rawCount:         window.__lastRawCount ?? null,
+        layersQueried:    window.__lastLayersQueried ?? null,
+        rawMinDist:       window.__lastRawMinDist ?? null,
+        rawLayerSummary:  window.__lastRawLayerSummary ?? null,
       };
     }
 

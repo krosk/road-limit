@@ -235,7 +235,9 @@ metadata and the current road topology.
     "turnReason": null,
     "turnCard": { ... },
     "rawCount": 42,
-    "layersQueried": 18
+    "layersQueried": 18,
+    "rawMinDist": 5,
+    "rawLayerSummary": { "road_primary": 5, "road_primary_casing": 5, "road_secondary": 120 }
   },
   "features": [ /* GeoJSON LineString features as returned by normaliseFeatures,
                    each annotated with _distToCar (metres, min distance to car) */ ]
