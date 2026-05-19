@@ -24,6 +24,10 @@ npm test                # both
 
 Tests must pass before every push. The unit tests run in well under 1s.
 
+Every fix that follows a payload analysis (a fixture uploaded by the user
+to diagnose a real-world bug) must be accompanied by a regression test in
+`test/road.test.js` that would have caught the bug before the fix.
+
 ## Structure
 
 ```
