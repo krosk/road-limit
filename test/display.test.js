@@ -8,6 +8,7 @@ import {
   barState,
   badgeItems,
   debugTripletFeatures,
+  turnPathSVG,
 } from '../lib/display.js';
 
 const A = 0.30 * 9.81; // default aThreshold
@@ -253,5 +254,90 @@ describe('debugTripletFeatures', () => {
     const seg = { pts: [[2,48],[2.001,48],[2.002,48]], turns: [], isBehind: false };
     const [f] = debugTripletFeatures([seg], 1);
     assert.equal(f.properties.color, '#555');
+  });
+});
+
+// ── turnPathSVG ───────────────────────────────────────────────────────────────
+
+describe('turnPathSVG', () => {
+  // Straight road going north: [lon, lat] pairs with increasing lat
+  const straight = [[2, 48], [2, 48.0005], [2, 48.001]];
+  // Right-turning road: north then east
+  const rightTurn = [[2, 48], [2, 48.0005], [2.0005, 48.0005]];
+  // Left-turning road: north then west
+  const leftTurn  = [[2, 48], [2, 48.0005], [1.9995, 48.0005]];
+
+  test('returns SVG string', () => {
+    const svg = turnPathSVG(straight);
+    assert.ok(typeof svg === 'string');
+    assert.ok(svg.startsWith('<svg'));
+  });
+
+  test('contains a polyline element', () => {
+    assert.ok(turnPathSVG(straight).includes('<polyline'));
+  });
+
+  test('uses currentColor stroke', () => {
+    assert.ok(turnPathSVG(straight).includes('stroke="currentColor"'));
+  });
+
+  test('fewer than 2 pts returns empty SVG', () => {
+    const svg = turnPathSVG([[2, 48]]);
+    assert.ok(svg.includes('<svg'));
+    assert.ok(!svg.includes('<polyline'));
+  });
+
+  test('null pts returns empty SVG', () => {
+    const svg = turnPathSVG(null);
+    assert.ok(!svg.includes('<polyline'));
+  });
+
+  test('pts[0] is placed at bottom-centre (w/2, h-pad)', () => {
+    const w = 52, h = 52, pad = 5;
+    const svg = turnPathSVG(straight, w, h);
+    const pointsMatch = svg.match(/points="([^"]+)"/);
+    assert.ok(pointsMatch, 'polyline must have points attribute');
+    const first = pointsMatch[1].trim().split(' ')[0];
+    const [x, y] = first.split(',').map(Number);
+    assert.ok(Math.abs(x - w / 2) < 1, `start x should be near w/2=${w/2}, got ${x}`);
+    assert.ok(Math.abs(y - (h - pad)) < 1, `start y should be near h-pad=${h-pad}, got ${y}`);
+  });
+
+  test('right-turn road has last point to the right of pts[0]', () => {
+    const svg = turnPathSVG(rightTurn);
+    const pointsMatch = svg.match(/points="([^"]+)"/);
+    const coords = pointsMatch[1].trim().split(' ').map(s => s.split(',').map(Number));
+    const startX = coords[0][0];
+    const lastX  = coords[coords.length - 1][0];
+    assert.ok(lastX > startX, `right turn: last x (${lastX}) should be > start x (${startX})`);
+  });
+
+  test('left-turn road has last point to the left of pts[0]', () => {
+    const svg = turnPathSVG(leftTurn);
+    const pointsMatch = svg.match(/points="([^"]+)"/);
+    const coords = pointsMatch[1].trim().split(' ').map(s => s.split(',').map(Number));
+    const startX = coords[0][0];
+    const lastX  = coords[coords.length - 1][0];
+    assert.ok(lastX < startX, `left turn: last x (${lastX}) should be < start x (${startX})`);
+  });
+
+  test('all points stay within SVG bounds', () => {
+    const w = 52, h = 52;
+    for (const ptSet of [straight, rightTurn, leftTurn]) {
+      const svg = turnPathSVG(ptSet, w, h);
+      const pointsMatch = svg.match(/points="([^"]+)"/);
+      const coords = pointsMatch[1].trim().split(' ').map(s => s.split(',').map(Number));
+      for (const [x, y] of coords) {
+        assert.ok(x >= 0 && x <= w, `x=${x} out of [0,${w}]`);
+        assert.ok(y >= 0 && y <= h, `y=${y} out of [0,${h}]`);
+      }
+    }
+  });
+
+  test('respects custom w and h', () => {
+    const svg = turnPathSVG(straight, 80, 100);
+    assert.ok(svg.includes('width="80"'));
+    assert.ok(svg.includes('height="100"'));
+    assert.ok(svg.includes('viewBox="0 0 80 100"'));
   });
 });
