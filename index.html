@@ -558,6 +558,8 @@
       const raw = map.queryRenderedFeatures({ layers: roadLayers });
       const f = normaliseFeatures(raw);
       window.__lastFeatures = f;
+      window.__lastRawCount = raw.length;
+      window.__lastLayersQueried = roadLayers.length;
       return f;
     }
 
@@ -893,18 +895,33 @@
       setStatus(statusText(features, segments, match, S.accuracy, turnReason));
 
       const forward = segments.filter(s => !s.isBehind);
+
+      // Annotate each feature with its min distance to the car for diagnostic use
+      if (S.lat !== null) {
+        for (const f of features) {
+          let minD = Infinity;
+          for (const c of f.geometry.coordinates) {
+            const d = haversine(S.lat, S.lon, c[1], c[0]);
+            if (d < minD) minD = d;
+          }
+          f._distToCar = Math.round(minD);
+        }
+      }
+
       window.__lastDiag = {
-        commit:      _commitSha,
-        timestamp:   new Date().toISOString(),
-        position:    { lon: S.lon, lat: S.lat, heading: S.heading, accuracy: S.accuracy },
-        speed:       kmh,
-        map:         map ? { zoom: map.getZoom(), pitch: map.getPitch(), bearing: map.getBearing() } : null,
-        cfg:         { lookahead: CFG.lookahead, roadMatchMaxDist: CFG.roadMatchMaxDist, aThreshold: CFG.aThreshold },
-        match:       match ? { dist: Math.round(match.dist), road: match.feature.properties?.name ?? match.feature.properties?.ref ?? null, class: match.feature.properties?.class ?? null } : null,
-        segments:    { forward: forward.length, behind: segments.filter(s => s.isBehind).length },
+        commit:        _commitSha,
+        timestamp:     new Date().toISOString(),
+        position:      { lon: S.lon, lat: S.lat, heading: S.heading, accuracy: S.accuracy },
+        speed:         kmh,
+        map:           map ? { zoom: map.getZoom(), pitch: map.getPitch(), bearing: map.getBearing() } : null,
+        cfg:           { lookahead: CFG.lookahead, roadMatchMaxDist: CFG.roadMatchMaxDist, aThreshold: CFG.aThreshold },
+        match:         match ? { dist: Math.round(match.dist), road: match.feature.properties?.name ?? match.feature.properties?.ref ?? null, class: match.feature.properties?.class ?? null } : null,
+        segments:      { forward: forward.length, behind: segments.filter(s => s.isBehind).length },
         forwardClasses: forward.map(s => s.pts?.length),
         turnReason,
-        turnCard:    card,
+        turnCard:      card,
+        rawCount:      window.__lastRawCount ?? null,
+        layersQueried: window.__lastLayersQueried ?? null,
       };
     }
 

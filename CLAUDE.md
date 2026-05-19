@@ -233,9 +233,12 @@ metadata and the current road topology.
     "match": { "dist": 8, "road": "Rue de Rivoli", "class": "primary" },
     "segments": { "forward": 1, "behind": 0 },
     "turnReason": null,
-    "turnCard": { ... }
+    "turnCard": { ... },
+    "rawCount": 42,
+    "layersQueried": 18
   },
-  "features": [ /* GeoJSON LineString features as returned by normaliseFeatures */ ]
+  "features": [ /* GeoJSON LineString features as returned by normaliseFeatures,
+                   each annotated with _distToCar (metres, min distance to car) */ ]
 }
 ```
 
