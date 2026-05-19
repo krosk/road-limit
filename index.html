@@ -280,7 +280,6 @@
     #panel-toggle-row {
       display: flex;
       justify-content: center;
-      align-items: center;
       margin: 6px 0 2px;
     }
 
@@ -296,14 +295,21 @@
 
     #fullscreen-btn {
       position: absolute;
-      right: 16px;
-      background: transparent;
+      right: 12px;
+      bottom: 100px;
+      z-index: 10;
+      background: rgba(17, 17, 17, 0.85);
       border: none;
-      color: #444;
-      font-size: 18px;
+      border-radius: 10px;
+      color: #fff;
+      font-size: 20px;
       line-height: 1;
       cursor: pointer;
-      padding: 0;
+      width: 40px;
+      height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
 
     /* Debug: BFS start-node marker */
@@ -427,7 +433,6 @@
 
     <div id="panel-toggle-row">
       <button id="panel-toggle-btn">⌄</button>
-      <button id="fullscreen-btn" title="Toggle fullscreen">⛶</button>
     </div>
 
     <div id="panel-lower">
@@ -464,6 +469,8 @@
       <div id="version-msg" style="font-size:10px;color:#fff;margin-top:2px;text-align:right;"></div>
     </div>
   </div>
+
+  <button id="fullscreen-btn" title="Toggle fullscreen">⛶</button>
 
   <script type="module">
     import { haversine, bearingTo, destPoint, ptAtDistance, bearingAtDistance } from './lib/geo.js';
