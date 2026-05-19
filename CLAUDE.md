@@ -266,16 +266,20 @@ into `mockFeatures` for e2e tests.
 ### LDR — load a fixture at runtime
 
 The **LDR** button next to CPY opens a file picker. Loading a `roads.json`
-file (CPY format) restores the full app state for before/after comparison:
-- Injects features via `window.__mockFeatures` (bypasses `queryRenderedFeatures`)
+file (CPY format) restores the map state for before/after comparison:
 - Switches to SET mode and applies `meta.position` (lon, lat, heading)
 - Restores `meta.map` (zoom, pitch, bearing) via `map.jumpTo`
 - Restores `meta.cfg` (lookahead, roadMatchMaxDist) including UI inputs
-- Calls `renderDashboard()` immediately
-- Shows `Loaded N features @ <commit>` in the status line for 4 s
+- Calls `renderDashboard()` immediately (tiles may not be loaded yet)
+- Road features are computed from the live map tiles once they load (`idle` event)
+- Shows `Position loaded @ <commit>` in the status line for 4 s
+
+Features from the file are **not** injected — `queryRenderedFeatures` always
+runs on the real rendered tiles. `window.__setMockFeatures` is reserved for
+Playwright e2e tests only.
 
 **LDR feedback:**
-- **✓** — loaded successfully (status line shows feature count + commit)
+- **✓** — loaded successfully (status line shows commit)
 - **✗** — file parse error (status line shows error message for 5 s)
 
 The file input is always reset after load, so the same file can be reloaded

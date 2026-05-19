@@ -1078,12 +1078,6 @@
           const raw = JSON.parse(ev.target.result);
           const features = Array.isArray(raw) ? raw : raw.features;
           const meta     = Array.isArray(raw) ? null : raw.meta;
-          _mockFeatures  = features;
-          window.__lastFeatures = features;
-          window.__lastRawCount     = null;
-          window.__lastLayersQueried = null;
-          window.__lastRawMinDist   = null;
-          window.__lastRawLayerSummary = null;
 
           // Switch to SET mode and apply position from meta if available
           if (meta?.position?.lon != null) {
@@ -1117,7 +1111,7 @@
 
           renderDashboard();
           btn.textContent = '✓';
-          pinStatus(`Loaded ${features.length} features` + (meta?.commit ? ` @ ${meta.commit}` : ''), 4000);
+          pinStatus(`Position loaded` + (meta?.commit ? ` @ ${meta.commit}` : ''), 4000);
         } catch (err) {
           btn.textContent = '✗';
           pinStatus('LDR: ' + (err.message || err), 5000);
