@@ -897,7 +897,7 @@
       // Turn summary card
       const { card: turnData, reason: turnReason } = firstTurnAhead(
         features, S.lon, S.lat, S.heading, CFG.lookahead, maxTurnRadius, CFG.aThreshold, CFG.roadMatchMaxDist
-      );
+      ) ?? { card: null, reason: null };
       const card = computeTurnCard(turnData, kmh);
       const turnCardEl = document.getElementById('turn-card');
       if (card !== null) {
