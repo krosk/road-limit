@@ -1091,7 +1091,7 @@
             S.heading = meta.position.heading ?? null;
             S.lastHeading = S.heading;
             S.accuracy = meta.position.accuracy ?? null;
-            S.speed = 0;
+            S.speed = (meta.speed ?? 0) / 3.6;
             setPosInputs(S.lon, S.lat, S.heading);
             updateCarPosition(S.lon, S.lat);
             if (map && meta.map) {
