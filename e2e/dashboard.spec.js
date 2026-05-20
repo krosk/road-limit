@@ -83,7 +83,7 @@ test('turn card shown for single road with 90° turn', async ({ page }) => {
   await page.locator('#start-btn').click();
   await expect(page.locator('#turn-card')).toBeVisible({ timeout: 3000 });
   await expect(page.locator('#turn-card-speed')).toHaveText(/\d+/);
-  await expect(page.locator('#turn-card-arrow')).toHaveText(/[←→]/);
+  await expect(page.locator('#turn-card-arrow svg')).toBeVisible();
 });
 
 test('turn card hidden at junction — branch road within lookahead suppresses card', async ({ page }) => {

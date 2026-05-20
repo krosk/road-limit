@@ -1065,9 +1065,8 @@
       const reader = new FileReader();
       reader.onload = (ev) => {
         try {
-          const raw = JSON.parse(ev.target.result);
-          const features = Array.isArray(raw) ? raw : raw.features;
-          const meta     = Array.isArray(raw) ? null : raw.meta;
+          const raw  = JSON.parse(ev.target.result);
+          const meta = Array.isArray(raw) ? null : raw.meta;
 
           // Switch to SET mode and apply position from meta if available
           if (meta?.position?.lon != null) {
