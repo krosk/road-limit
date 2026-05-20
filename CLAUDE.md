@@ -51,7 +51,7 @@ test/
   motion.test.js        unit tests for lib/motion.js
   state.test.js         unit tests for lib/state.js
   display.test.js       unit tests for lib/display.js
-                        150 unit tests total across all lib files
+                        152 unit tests total across all lib files
 e2e/
   dashboard.spec.js     Playwright: mocks GPS + road features
   fixtures/             JSON road-feature fixtures for replay testing
@@ -174,14 +174,24 @@ WebGL canvas. Consequences:
   are grouped by net bearing (30° tolerance). Groups within 30° of each
   other are the same physical road split across OSM features (tile edges,
   layer duplicates). After grouping, direction groups whose `roadClass` is
-  in `MINOR_CLASSES` (`service`, `track`, `path`, `footway`, `cycleway`,
-  `steps`, `bridleway`) are discarded when at least one group is on a proper
-  driveable road — service spurs, field tracks and footpaths that happen to
-  branch off are not genuine turn options. Only `dirGroups.length !== 1` —
+  in `MINOR_CLASSES` (`minor`, `service`, `track`, `path`, `footway`,
+  `cycleway`, `steps`, `bridleway`) are discarded when at least one group
+  is on a proper driveable road — residential side streets, service spurs,
+  field tracks and footpaths that happen to branch off a motorway or primary
+  road are not genuine turn options. Only `dirGroups.length !== 1` —
   genuinely distinct driveable directions — suppresses the turn card.
   Within a direction group, a minor-road segment can never evict a main-road
   segment even if it has more pts — road class takes priority over pts count
   when selecting the representative segment for turn computation.
+- **Oneway roads in BFS**: when `segmentsAhead` discovers connecting features
+  at junction nodes, features with `oneway===1` are only queued in the
+  forward (coordinate-order) direction. The backward walk is skipped because
+  it represents contra-flow travel. The heading filter would normally reject
+  a forward walk that goes backward relative to the car, but skipping the
+  backward queue entry is also necessary: on a divided highway the opposite
+  carriageway (oneway in the other direction) shares junction nodes with the
+  matched road; its wrong-way backward walk could otherwise pass the heading
+  filter and create a spurious second direction group.
 
 ## Configuration
 

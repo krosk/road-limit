@@ -570,6 +570,61 @@ test('firstTurnAhead: service road spur in same bearing group does not evict pri
   assert.ok(result.minSpeed > 30, `primary road must dominate; got minSpeed=${result.minSpeed}`);
 });
 
+test('firstTurnAhead: minor road parallel to motorway does not suppress turn card (roads_29)', () => {
+  // Reproduces roads_29: car on a motorway (class=motorway) with many class=minor roads
+  // branching from junction nodes. Before fix, 'minor' was not in MINOR_CLASSES, so
+  // minor-road direction groups were treated as "main roads" alongside the motorway
+  // group, producing multiple distinct directions → junction suppression → no card.
+  // After fix, minor groups are discarded when a motorway group exists.
+  const motorway = {
+    type: 'Feature',
+    geometry: { type: 'LineString', coordinates: [
+      [2.0, 48.0], [2.001, 48.0], [2.002, 48.0], [2.002, 48.001],
+    ]},
+    properties: { class: 'motorway', oneway: 1 },
+  };
+  // Minor road joins at [2.001, 48.0] and continues east then NE — a distinctly
+  // different net bearing from the motorway's NNE, creating a separate direction
+  // group with the old code. It is >30 m long to allow it to create a new group.
+  const minorRoad = {
+    type: 'Feature',
+    geometry: { type: 'LineString', coordinates: [
+      [2.001, 48.0], [2.002, 48.0003], [2.003, 48.0003],
+    ]},
+    properties: { class: 'minor' },
+  };
+  const result = firstTurnAhead([motorway, minorRoad], 2.0, 48.0, 90, 500, MAX_R, A, 50);
+  assert.ok(result !== null, 'minor road must not create a spurious junction on a motorway');
+});
+
+test('firstTurnAhead: oneway road is not walked backward in BFS (opposite carriageway fix)', () => {
+  // Reproduces the roads_29 pattern where BFS queues the reverse walk on a oneway
+  // feature whose backward direction happens to pass the heading filter.
+  // A secondary road going west (oneway=1) connects at the same node as the main
+  // road. Without the fix, backward walk on it goes east — a different net bearing
+  // from the main road's NNE — creating a second direction group → junction → null.
+  // After the fix, only the forward (west) walk is queued; the heading filter
+  // rejects it, leaving a single group → turn card shown.
+  const mainRoad = {
+    type: 'Feature',
+    geometry: { type: 'LineString', coordinates: [
+      [2.0, 48.0], [2.001, 48.0], [2.002, 48.0], [2.002, 48.001],
+    ]},
+    properties: { class: 'secondary' },
+  };
+  // Oneway road: coordinates go west (lon decreasing), so forward=west, backward=east.
+  // Its last node [2.001, 48.0] coincides with mainRoad's second node.
+  const onewayWest = {
+    type: 'Feature',
+    geometry: { type: 'LineString', coordinates: [
+      [2.003, 48.0], [2.001, 48.0],
+    ]},
+    properties: { class: 'secondary', oneway: 1 },
+  };
+  const result = firstTurnAhead([mainRoad, onewayWest], 2.0, 48.0, 90, 500, MAX_R, A, 50);
+  assert.ok(result !== null, 'backward walk on a oneway road must not create a spurious junction');
+});
+
 // ── normaliseFeatures ─────────────────────────────────────────────────────────
 
 const coords = [[2, 48], [2.001, 48]];
