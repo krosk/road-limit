@@ -625,6 +625,36 @@ test('firstTurnAhead: oneway road is not walked backward in BFS (opposite carria
   assert.ok(result !== null, 'backward walk on a oneway road must not create a spurious junction');
 });
 
+test('firstTurnAhead: null heading uses matched-road direction — opposite oneway carriageway filtered (roads_29)', () => {
+  // Reproduces the roads_29 divided-highway scenario when heading is unknown
+  // (app just started, below minSpeedForHeading, or compass unavailable).
+  // Without the fix, heading=null skips the direction filter and the opposite
+  // carriageway (oneway=1 going west) passes through as a second motorway
+  // direction group → junction → null.
+  // With the fix, the matched road's own initBearing is used as a reference
+  // direction when heading===null, so the opposite carriageway is filtered.
+  const eastCarriageway = {
+    type: 'Feature',
+    geometry: { type: 'LineString', coordinates: [
+      [2.0, 48.0], [2.001, 48.0], [2.002, 48.0], [2.002, 48.001],
+    ]},
+    properties: { class: 'motorway', oneway: 1 },
+  };
+  const westCarriageway = {
+    type: 'Feature',
+    geometry: { type: 'LineString', coordinates: [
+      [2.002, 48.0002], [2.001, 48.0002], [2.0, 48.0002],
+    ]},
+    properties: { class: 'motorway', oneway: 1 },
+  };
+  // With heading=90°: should show turn card (works before and after fix)
+  const withHeading = firstTurnAhead([eastCarriageway, westCarriageway], 2.0, 48.0, 90, 500, MAX_R, A, 50);
+  assert.ok(withHeading !== null, 'turn card must be shown with known heading');
+  // With heading=null: must also show turn card using matched-road direction as reference
+  const nullHeading  = firstTurnAhead([eastCarriageway, westCarriageway], 2.0, 48.0, null, 500, MAX_R, A, 50);
+  assert.ok(nullHeading  !== null, 'turn card must be shown even with null heading on a divided highway');
+});
+
 // ── normaliseFeatures ─────────────────────────────────────────────────────────
 
 const coords = [[2, 48], [2.001, 48]];

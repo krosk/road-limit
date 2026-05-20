@@ -51,7 +51,7 @@ test/
   motion.test.js        unit tests for lib/motion.js
   state.test.js         unit tests for lib/state.js
   display.test.js       unit tests for lib/display.js
-                        152 unit tests total across all lib files
+                        153 unit tests total across all lib files
 e2e/
   dashboard.spec.js     Playwright: mocks GPS + road features
   fixtures/             JSON road-feature fixtures for replay testing
@@ -192,6 +192,14 @@ WebGL canvas. Consequences:
   carriageway (oneway in the other direction) shares junction nodes with the
   matched road; its wrong-way backward walk could otherwise pass the heading
   filter and create a spurious second direction group.
+- **`refHeading` in `firstTurnAhead`**: the direction filter in the grouping
+  loop uses `refHeading` instead of the raw `heading`. When `heading` is null
+  (app just started, speed below `minSpeedForHeading`, compass unavailable),
+  `refHeading` falls back to the initial bearing of `forward[0]` — the matched
+  segment's own travel direction. Without this, `heading===null` skips the
+  filter entirely; on a divided highway the opposite carriageway's forward
+  (contra-flow) BFS walk passes unfiltered and creates a second `motorway`
+  direction group, suppressing the turn card.
 
 ## Configuration
 
