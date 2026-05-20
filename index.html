@@ -1088,10 +1088,10 @@
             document.querySelectorAll('#pos-inputs input').forEach(i => i.removeAttribute('readonly'));
             S.lon = meta.position.lon;
             S.lat = meta.position.lat;
-            S.heading = meta.position.heading ?? S.heading;
+            S.heading = meta.position.heading ?? null;
             S.lastHeading = S.heading;
-            S.accuracy = meta.position.accuracy ?? S.accuracy;
-            S.speed = (meta.speed ?? 0) / 3.6;
+            S.accuracy = meta.position.accuracy ?? null;
+            S.speed = 0;
             setPosInputs(S.lon, S.lat, S.heading);
             updateCarPosition(S.lon, S.lat);
             if (map && meta.map) {
