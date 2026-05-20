@@ -363,28 +363,36 @@ const straightFeature = {
 };
 
 test('firstTurnAhead: no features → null', () => {
-  assert.strictEqual(firstTurnAhead([], 2.0, 48.0, 90, 500, MAX_R, A), null);
+  assert.strictEqual(firstTurnAhead([], 2.0, 48.0, 90, 500, MAX_R, A).card, null);
+});
+
+test('firstTurnAhead: no features → reason no match', () => {
+  assert.strictEqual(firstTurnAhead([], 2.0, 48.0, 90, 500, MAX_R, A).reason, 'no match');
 });
 
 test('firstTurnAhead: straight road → null', () => {
-  assert.strictEqual(firstTurnAhead([straightFeature], 2.0, 48.0, 90, 500, MAX_R, A, 50), null);
+  assert.strictEqual(firstTurnAhead([straightFeature], 2.0, 48.0, 90, 500, MAX_R, A, 50).card, null);
+});
+
+test('firstTurnAhead: straight road → reason straight', () => {
+  assert.strictEqual(firstTurnAhead([straightFeature], 2.0, 48.0, 90, 500, MAX_R, A, 50).reason, 'straight');
 });
 
 test('firstTurnAhead: 90° left turn (east→north) within lookahead → direction left', () => {
-  const result = firstTurnAhead([leftTurnFeature], 2.0, 48.0, 90, 500, MAX_R, A, 50);
-  assert.ok(result !== null, 'Expected turn to be detected');
-  assert.strictEqual(result.direction, 'left');
+  const { card } = firstTurnAhead([leftTurnFeature], 2.0, 48.0, 90, 500, MAX_R, A, 50);
+  assert.ok(card !== null, 'Expected turn to be detected');
+  assert.strictEqual(card.direction, 'left');
 });
 
 test('firstTurnAhead: 90° right turn (east→south) within lookahead → direction right', () => {
-  const result = firstTurnAhead([rightTurnFeature], 2.0, 48.0, 90, 500, MAX_R, A, 50);
-  assert.ok(result !== null, 'Expected turn to be detected');
-  assert.strictEqual(result.direction, 'right');
+  const { card } = firstTurnAhead([rightTurnFeature], 2.0, 48.0, 90, 500, MAX_R, A, 50);
+  assert.ok(card !== null, 'Expected turn to be detected');
+  assert.strictEqual(card.direction, 'right');
 });
 
 test('firstTurnAhead: turn beyond lookahead → null', () => {
   // Turn node is at cumdist ≈ 73 m — only find it with lookahead > 73 m
-  assert.strictEqual(firstTurnAhead([leftTurnFeature], 2.0, 48.0, 90, 50, MAX_R, A, 50), null);
+  assert.strictEqual(firstTurnAhead([leftTurnFeature], 2.0, 48.0, 90, 50, MAX_R, A, 50).card, null);
 });
 
 test('firstTurnAhead: track branching off a tertiary road does not suppress turn card', () => {
@@ -406,9 +414,9 @@ test('firstTurnAhead: track branching off a tertiary road does not suppress turn
     ]},
     properties: { class: 'track' },
   };
-  const result = firstTurnAhead([tertiaryRoad, trackBranch], 2.0, 48.0, 90, 500, MAX_R, A, 50);
-  assert.ok(result !== null, 'track branch should be discarded; turn card must show');
-  assert.strictEqual(result.direction, 'left');
+  const { card } = firstTurnAhead([tertiaryRoad, trackBranch], 2.0, 48.0, 90, 500, MAX_R, A, 50);
+  assert.ok(card !== null, 'track branch should be discarded; turn card must show');
+  assert.strictEqual(card.direction, 'left');
 });
 
 test('firstTurnAhead: track with more pts in same bearing group does not evict main road', () => {
@@ -435,11 +443,11 @@ test('firstTurnAhead: track with more pts in same bearing group does not evict m
     ]},
     properties: { class: 'track' },
   };
-  const result = firstTurnAhead([tertiary, track], 2.0, 48.001, 210, 500, MAX_R, A, 50);
+  const { card } = firstTurnAhead([tertiary, track], 2.0, 48.001, 210, 500, MAX_R, A, 50);
   // With old code (pts.length wins): track replaces tertiary → straight → null.
   // With new code (class wins): tertiary kept → right bend detected → non-null.
-  assert.ok(result !== null, 'tertiary bend must be detected; track must not evict main road');
-  assert.strictEqual(result.direction, 'right', 'direction must come from tertiary geometry');
+  assert.ok(card !== null, 'tertiary bend must be detected; track must not evict main road');
+  assert.strictEqual(card.direction, 'right', 'direction must come from tertiary geometry');
 });
 
 
@@ -474,8 +482,8 @@ test('firstTurnAhead: short feature-boundary stub does not create spurious junct
     ]},
     properties: {},
   };
-  const result = firstTurnAhead([shortStub, longContinuation], 2.00025, 48.0003, 180, 500, MAX_R, A, 50);
-  assert.ok(result !== null, 'short stub should join the longer segment\'s group, not create a spurious junction');
+  const { card } = firstTurnAhead([shortStub, longContinuation], 2.00025, 48.0003, 180, 500, MAX_R, A, 50);
+  assert.ok(card !== null, 'short stub should join the longer segment\'s group, not create a spurious junction');
 });
 
 test('firstTurnAhead: backward BFS branch does not suppress turn card', () => {
@@ -498,9 +506,9 @@ test('firstTurnAhead: backward BFS branch does not suppress turn card', () => {
     ]},
     properties: {},
   };
-  const result = firstTurnAhead([southToWestRoad, northBranch], 2.0, 48.002, 180, 500, MAX_R, A, 50);
-  assert.ok(result !== null, 'northward branch (>90° from heading) should be filtered; turn card must show');
-  assert.strictEqual(result.direction, 'right');
+  const { card } = firstTurnAhead([southToWestRoad, northBranch], 2.0, 48.002, 180, 500, MAX_R, A, 50);
+  assert.ok(card !== null, 'northward branch (>90° from heading) should be filtered; turn card must show');
+  assert.strictEqual(card.direction, 'right');
 });
 
 test('firstTurnAhead: junction (2 forward segments) → null', () => {
@@ -513,19 +521,20 @@ test('firstTurnAhead: junction (2 forward segments) → null', () => {
     properties: {},
   };
   const result = firstTurnAhead([leftTurnFeature, branchFeature], 2.0, 48.0, 90, 120, MAX_R, A, 50);
-  assert.strictEqual(result, null);
+  assert.strictEqual(result.card, null);
+  assert.strictEqual(result.reason, 'junction');
 });
 
 test('firstTurnAhead: distanceToStart > 0 for non-immediate turn', () => {
-  const result = firstTurnAhead([leftTurnFeature], 2.0, 48.0, 90, 500, MAX_R, A, 50);
-  assert.ok(result !== null);
-  assert.ok(result.distanceToStart > 0, `Expected distanceToStart > 0, got ${result.distanceToStart}`);
+  const { card } = firstTurnAhead([leftTurnFeature], 2.0, 48.0, 90, 500, MAX_R, A, 50);
+  assert.ok(card !== null);
+  assert.ok(card.distanceToStart > 0, `Expected distanceToStart > 0, got ${card.distanceToStart}`);
 });
 
 test('firstTurnAhead: minSpeed > 0', () => {
-  const result = firstTurnAhead([leftTurnFeature], 2.0, 48.0, 90, 500, MAX_R, A, 50);
-  assert.ok(result !== null);
-  assert.ok(result.minSpeed !== null && result.minSpeed > 0);
+  const { card } = firstTurnAhead([leftTurnFeature], 2.0, 48.0, 90, 500, MAX_R, A, 50);
+  assert.ok(card !== null);
+  assert.ok(card.minSpeed !== null && card.minSpeed > 0);
 });
 
 test('firstTurnAhead: service road spur in same bearing group does not evict primary road (roads_28)', () => {
@@ -561,13 +570,13 @@ test('firstTurnAhead: service road spur in same bearing group does not evict pri
     ]},
     properties: { class: 'service' },
   };
-  const result = firstTurnAhead([primary, service], 2.0, 48.0, 20, 500, MAX_R, A, 50);
+  const { card } = firstTurnAhead([primary, service], 2.0, 48.0, 20, 500, MAX_R, A, 50);
   // Service road must not evict primary: result must reflect primary's geometry.
   // Primary's gentle arc gives a much higher minSpeed than a tight service-road curve.
-  assert.ok(result !== null, 'turn card must be shown');
+  assert.ok(card !== null, 'turn card must be shown');
   // The primary road's minSpeed must be above the service road's tight corner speed.
   // This catches regression: service road spur used instead of primary.
-  assert.ok(result.minSpeed > 30, `primary road must dominate; got minSpeed=${result.minSpeed}`);
+  assert.ok(card.minSpeed > 30, `primary road must dominate; got minSpeed=${card.minSpeed}`);
 });
 
 test('firstTurnAhead: minor road parallel to motorway does not suppress turn card (roads_29)', () => {
@@ -593,8 +602,8 @@ test('firstTurnAhead: minor road parallel to motorway does not suppress turn car
     ]},
     properties: { class: 'minor' },
   };
-  const result = firstTurnAhead([motorway, minorRoad], 2.0, 48.0, 90, 500, MAX_R, A, 50);
-  assert.ok(result !== null, 'minor road must not create a spurious junction on a motorway');
+  const { card } = firstTurnAhead([motorway, minorRoad], 2.0, 48.0, 90, 500, MAX_R, A, 50);
+  assert.ok(card !== null, 'minor road must not create a spurious junction on a motorway');
 });
 
 test('firstTurnAhead: oneway road is not walked backward in BFS (opposite carriageway fix)', () => {
@@ -621,8 +630,8 @@ test('firstTurnAhead: oneway road is not walked backward in BFS (opposite carria
     ]},
     properties: { class: 'secondary', oneway: 1 },
   };
-  const result = firstTurnAhead([mainRoad, onewayWest], 2.0, 48.0, 90, 500, MAX_R, A, 50);
-  assert.ok(result !== null, 'backward walk on a oneway road must not create a spurious junction');
+  const { card } = firstTurnAhead([mainRoad, onewayWest], 2.0, 48.0, 90, 500, MAX_R, A, 50);
+  assert.ok(card !== null, 'backward walk on a oneway road must not create a spurious junction');
 });
 
 test('firstTurnAhead: null heading uses matched-road direction — opposite oneway carriageway filtered (roads_29)', () => {
@@ -649,10 +658,10 @@ test('firstTurnAhead: null heading uses matched-road direction — opposite onew
   };
   // With heading=90°: should show turn card (works before and after fix)
   const withHeading = firstTurnAhead([eastCarriageway, westCarriageway], 2.0, 48.0, 90, 500, MAX_R, A, 50);
-  assert.ok(withHeading !== null, 'turn card must be shown with known heading');
+  assert.ok(withHeading.card !== null, 'turn card must be shown with known heading');
   // With heading=null: must also show turn card using matched-road direction as reference
-  const nullHeading  = firstTurnAhead([eastCarriageway, westCarriageway], 2.0, 48.0, null, 500, MAX_R, A, 50);
-  assert.ok(nullHeading  !== null, 'turn card must be shown even with null heading on a divided highway');
+  const nullHeading = firstTurnAhead([eastCarriageway, westCarriageway], 2.0, 48.0, null, 500, MAX_R, A, 50);
+  assert.ok(nullHeading.card !== null, 'turn card must be shown even with null heading on a divided highway');
 });
 
 // ── normaliseFeatures ─────────────────────────────────────────────────────────

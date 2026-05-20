@@ -895,7 +895,7 @@
       updateDebugTriplets(segments, maxTurnRadius);
 
       // Turn summary card
-      const turnData = firstTurnAhead(
+      const { card: turnData, reason: turnReason } = firstTurnAhead(
         features, S.lon, S.lat, S.heading, CFG.lookahead, maxTurnRadius, CFG.aThreshold, CFG.roadMatchMaxDist
       );
       const card = computeTurnCard(turnData, kmh);
@@ -910,15 +910,6 @@
         document.getElementById('turn-card-info').textContent = `${card.distanceToStart} m${timeStr}`;
       } else {
         turnCardEl.style.display = 'none';
-      }
-
-      // Diagnose why no turn card is shown
-      let turnReason = null;
-      if (card === null) {
-        const forward = segments.filter(s => !s.isBehind);
-        if (forward.length === 0)      turnReason = 'no match';
-        else if (forward.length > 1)   turnReason = 'junction';
-        else                           turnReason = 'straight';
       }
 
       setStatus(statusText(features, segments, match, S.accuracy, turnReason));
