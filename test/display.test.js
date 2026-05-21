@@ -2,6 +2,7 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   computeTurnCard,
+  overlayBadgeItems,
   overlayGeoJSON,
   segmentLineColor,
   segmentsGeoJSON,
@@ -163,6 +164,47 @@ describe('overlayGeoJSON', () => {
     const segs = [makeSeg([])];
     const gj = overlayGeoJSON(segs, null, true, null, 30, A);
     assert.equal(gj.features.length, 1);
+  });
+});
+
+// ── overlayBadgeItems ─────────────────────────────────────────────────────────
+
+// Tight 90° turn: three pts forming a right-angle bend
+const tightPts = [[0, 48], [0.002, 48], [0.002, 48.002]];
+const MAX_R_BADGE = 2000;
+
+describe('overlayBadgeItems', () => {
+  test('overlayAll=false, no mainRoadPts → empty', () => {
+    const items = overlayBadgeItems([], null, false, 30, A, MAX_R_BADGE);
+    assert.deepEqual(items, []);
+  });
+
+  test('overlayAll=false, straight mainRoadPts → no badges', () => {
+    const straight = [[0, 48], [0.001, 48], [0.002, 48]];
+    const items = overlayBadgeItems([], straight, false, 30, A, MAX_R_BADGE);
+    assert.equal(items.length, 0);
+  });
+
+  test('overlayAll=false, curvy mainRoadPts → badges on that path only', () => {
+    const other = { pts: [[1, 48], [1.002, 48], [1.002, 48.002]], turns: [{ radius: 50, distance: 100, angle: 90 }], isBehind: false };
+    const items = overlayBadgeItems([other], tightPts, false, 30, A, MAX_R_BADGE);
+    // badges come from tightPts, not from other segment
+    for (const item of items) {
+      assert.deepEqual(item.pts, tightPts);
+    }
+  });
+
+  test('overlayAll=true → badges from all segments', () => {
+    const seg = { pts: tightPts, turns: [{ radius: 50, distance: 100, angle: 90 }], isBehind: false };
+    const items = overlayBadgeItems([seg], null, true, 30, A, MAX_R_BADGE);
+    assert.equal(items.length, 1);
+  });
+
+  test('overlayAll=true ignores mainRoadPts', () => {
+    const seg = { pts: tightPts, turns: [{ radius: 50, distance: 100, angle: 90 }], isBehind: false };
+    const items = overlayBadgeItems([seg], [[9, 48], [9.001, 48]], true, 30, A, MAX_R_BADGE);
+    assert.equal(items.length, 1);
+    assert.deepEqual(items[0].pts, tightPts);
   });
 });
 
