@@ -457,7 +457,7 @@
                style="width:72px;background:#1a1a1a;border:1px solid #333;border-radius:6px;color:#fff;font-size:12px;padding:4px 6px;outline:none;margin-left:12px;">
         <span style="font-size:11px;color:#888;">lookahead</span>
         <button id="dbg-toggle" style="background:transparent;color:#fff;border:1px solid #666;border-radius:12px;padding:4px 0;font-size:12px;font-weight:600;cursor:pointer;flex-shrink:0;width:44px;text-align:center;margin-left:auto;">DBG</button>
-        <button id="overlay-toggle" style="background:#4af;color:#000;border:1px solid #4af;border-radius:12px;padding:4px 0;font-size:12px;font-weight:600;cursor:pointer;flex-shrink:0;width:44px;text-align:center;">RD</button>
+        <button id="overlay-toggle" style="background:transparent;color:#fff;border:1px solid #666;border-radius:12px;padding:4px 0;font-size:12px;font-weight:600;cursor:pointer;flex-shrink:0;width:44px;text-align:center;">RD</button>
         <button id="copy-roads-btn" style="background:transparent;color:#fff;border:1px solid #666;border-radius:12px;padding:4px 0;font-size:12px;font-weight:600;cursor:pointer;flex-shrink:0;width:44px;text-align:center;">CPY</button>
         <input type="file" id="load-roads-input" accept=".json" style="display:none">
         <button id="load-roads-btn" style="background:transparent;color:#fff;border:1px solid #666;border-radius:12px;padding:4px 0;font-size:12px;font-weight:600;cursor:pointer;flex-shrink:0;width:44px;text-align:center;">LDR</button>
@@ -497,7 +497,7 @@
 
     // ── Debug state ───────────────────────────────────────────────────────────
     let debugMode = false;
-    let overlayMain = true;
+    let overlayAll = false;
 
     // ── Mock features hook (Playwright / testing) ──────────────────────────────
     let _mockFeatures = null;
@@ -900,7 +900,7 @@
       // Update map overlays
       updateBadges(segments, kmh);
       if (map && map.getSource('segments-ahead')) {
-        map.getSource('segments-ahead').setData(overlayGeoJSON(segments, mainRoadPts, overlayMain, card, kmh, CFG.aThreshold));
+        map.getSource('segments-ahead').setData(overlayGeoJSON(segments, mainRoadPts, overlayAll, card, kmh, CFG.aThreshold));
       }
       updateDebugTriplets(segments, maxTurnRadius);
       const turnCardEl = document.getElementById('turn-card');
@@ -1034,11 +1034,12 @@
     });
 
     document.getElementById('overlay-toggle').addEventListener('click', () => {
-      overlayMain = !overlayMain;
+      overlayAll = !overlayAll;
       const btn = document.getElementById('overlay-toggle');
-      btn.style.background = overlayMain ? '#4af' : 'transparent';
-      btn.style.color = overlayMain ? '#000' : '#fff';
-      btn.style.borderColor = overlayMain ? '#4af' : '#666';
+      btn.style.background = overlayAll ? '#4af' : 'transparent';
+      btn.style.color = overlayAll ? '#000' : '#fff';
+      btn.style.borderColor = overlayAll ? '#4af' : '#666';
+
       if (S.lat !== null) renderDashboard();
     });
 

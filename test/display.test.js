@@ -118,50 +118,50 @@ describe('segmentsGeoJSON', () => {
 const mainPts = [[0, 48], [0.001, 48], [0.001, 48.001]];
 
 describe('overlayGeoJSON', () => {
-  test('overlayMain=true, no mainRoadPts → empty FeatureCollection', () => {
-    const gj = overlayGeoJSON([], null, true, null, 30, A);
+  test('overlayAll=false (default), no mainRoadPts → empty FeatureCollection', () => {
+    const gj = overlayGeoJSON([], null, false, null, 30, A);
     assert.equal(gj.type, 'FeatureCollection');
     assert.equal(gj.features.length, 0);
   });
 
-  test('overlayMain=true, mainRoadPts present → single feature with those coords', () => {
-    const gj = overlayGeoJSON([], mainPts, true, null, 30, A);
+  test('overlayAll=false, mainRoadPts present → single feature with those coords', () => {
+    const gj = overlayGeoJSON([], mainPts, false, null, 30, A);
     assert.equal(gj.features.length, 1);
     assert.deepEqual(gj.features[0].geometry.coordinates, mainPts);
   });
 
-  test('overlayMain=true, no card → gray', () => {
-    const gj = overlayGeoJSON([], mainPts, true, null, 30, A);
+  test('overlayAll=false, no card → gray', () => {
+    const gj = overlayGeoJSON([], mainPts, false, null, 30, A);
     assert.equal(gj.features[0].properties.color, '#888');
   });
 
-  test('overlayMain=true, card.isOver → red', () => {
+  test('overlayAll=false, card.isOver → red', () => {
     const card = { minSpeed: 40, isOver: true };
-    const gj = overlayGeoJSON([], mainPts, true, card, 50, A);
+    const gj = overlayGeoJSON([], mainPts, false, card, 50, A);
     assert.equal(gj.features[0].properties.color, '#e33');
   });
 
-  test('overlayMain=true, within 10 km/h of limit → orange', () => {
+  test('overlayAll=false, within 10 km/h of limit → orange', () => {
     const card = { minSpeed: 40, isOver: false };
-    const gj = overlayGeoJSON([], mainPts, true, card, 35, A);
+    const gj = overlayGeoJSON([], mainPts, false, card, 35, A);
     assert.equal(gj.features[0].properties.color, '#f90');
   });
 
-  test('overlayMain=true, well under limit → green', () => {
+  test('overlayAll=false, well under limit → green', () => {
     const card = { minSpeed: 40, isOver: false };
-    const gj = overlayGeoJSON([], mainPts, true, card, 20, A);
+    const gj = overlayGeoJSON([], mainPts, false, card, 20, A);
     assert.equal(gj.features[0].properties.color, '#3a9');
   });
 
-  test('overlayMain=false → delegates to segmentsGeoJSON (all segments)', () => {
+  test('overlayAll=true → delegates to segmentsGeoJSON (all segments)', () => {
     const segs = [makeSeg([]), makeSeg([])];
-    const gj = overlayGeoJSON(segs, mainPts, false, null, 30, A);
+    const gj = overlayGeoJSON(segs, mainPts, true, null, 30, A);
     assert.equal(gj.features.length, 2);
   });
 
-  test('overlayMain=false ignores mainRoadPts', () => {
+  test('overlayAll=true ignores mainRoadPts', () => {
     const segs = [makeSeg([])];
-    const gj = overlayGeoJSON(segs, null, false, null, 30, A);
+    const gj = overlayGeoJSON(segs, null, true, null, 30, A);
     assert.equal(gj.features.length, 1);
   });
 });
