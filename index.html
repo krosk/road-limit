@@ -457,7 +457,7 @@
                style="width:72px;background:#1a1a1a;border:1px solid #333;border-radius:6px;color:#fff;font-size:12px;padding:4px 6px;outline:none;margin-left:12px;">
         <span style="font-size:11px;color:#888;">lookahead</span>
         <button id="dbg-toggle" style="background:transparent;color:#fff;border:1px solid #666;border-radius:12px;padding:4px 0;font-size:12px;font-weight:600;cursor:pointer;flex-shrink:0;width:44px;text-align:center;margin-left:auto;">DBG</button>
-        <button id="overlay-toggle" style="background:transparent;color:#fff;border:1px solid #666;border-radius:12px;padding:4px 0;font-size:12px;font-weight:600;cursor:pointer;flex-shrink:0;width:44px;text-align:center;">RD</button>
+        <button id="overlay-toggle" style="background:#4af;color:#000;border:1px solid #4af;border-radius:12px;padding:4px 0;font-size:12px;font-weight:600;cursor:pointer;flex-shrink:0;width:44px;text-align:center;">RD</button>
         <button id="copy-roads-btn" style="background:transparent;color:#fff;border:1px solid #666;border-radius:12px;padding:4px 0;font-size:12px;font-weight:600;cursor:pointer;flex-shrink:0;width:44px;text-align:center;">CPY</button>
         <input type="file" id="load-roads-input" accept=".json" style="display:none">
         <button id="load-roads-btn" style="background:transparent;color:#fff;border:1px solid #666;border-radius:12px;padding:4px 0;font-size:12px;font-weight:600;cursor:pointer;flex-shrink:0;width:44px;text-align:center;">LDR</button>
@@ -497,7 +497,7 @@
 
     // ── Debug state ───────────────────────────────────────────────────────────
     let debugMode = false;
-    let overlayMain = false;
+    let overlayMain = true;
 
     // ── Mock features hook (Playwright / testing) ──────────────────────────────
     let _mockFeatures = null;
