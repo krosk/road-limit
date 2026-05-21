@@ -696,6 +696,39 @@ test('firstTurnAhead: motorway ramp branches do not suppress turn card (roads_32
   assert.ok(reason !== 'junction', `ramp branches must not suppress turn card; got reason=${reason}`);
 });
 
+test('firstTurnAhead: matched ramp with curvy continuation shows turn card (roads_33)', () => {
+  // Reproduces roads_33: car is on a motorway ramp (oneway+ramp) that ends at a junction J.
+  // From J, the ramp continues as a curvy segment (90° left turn) - this gives the turn card.
+  // A parallel non-ramp motorway at a different bearing also branches from J.
+  // Before fix: old ramp filter removed both ramp groups → non-ramp motorway (straight) → no card.
+  // After fix: inverse ramp filter removes the non-ramp group; series merge joins the two
+  // ramp segments (straight end + curvy continuation) into one path → turn card shown.
+  const matchedRamp = {
+    type: 'Feature',
+    geometry: { type: 'LineString', coordinates: [[0, 48], [0.001, 48], [0.002, 48]] },
+    properties: { class: 'motorway', ramp: 1, oneway: 1 },
+  };
+  const curvyRamp = { // continues from J=[0.002, 48], turns sharply north (tight left turn)
+    type: 'Feature',
+    geometry: { type: 'LineString', coordinates: [
+      [0.002, 48], [0.003, 48], [0.003, 48.003],
+    ]},
+    properties: { class: 'motorway', ramp: 1 },
+  };
+  const parallelMotorway = { // non-ramp at a different bearing from J — should be filtered
+    type: 'Feature',
+    geometry: { type: 'LineString', coordinates: [
+      [0.002, 48], [0.005, 48.0015], [0.008, 48.003],
+    ]},
+    properties: { class: 'motorway', oneway: 1 },
+  };
+  const { card, reason } = firstTurnAhead(
+    [matchedRamp, curvyRamp, parallelMotorway], 0.0005, 48, 90, 500, MAX_R, A, 50,
+  );
+  assert.ok(reason === null, `expected turn card from curvy ramp; got reason=${reason}`);
+  assert.ok(card !== null, 'expected non-null turn card');
+});
+
 // ── normaliseFeatures ─────────────────────────────────────────────────────────
 
 const coords = [[2, 48], [2.001, 48]];
