@@ -891,6 +891,12 @@
         features, S.lon, S.lat, S.heading, CFG.lookahead, maxTurnRadius, 0, CFG.roadMatchMaxDist
       );
 
+      // Turn summary card (computed first — used by both overlay and card UI)
+      const { pts: mainRoadPts, card: turnData, reason: turnReason } = firstTurnAhead(
+        features, S.lon, S.lat, S.heading, CFG.lookahead, maxTurnRadius, CFG.aThreshold, CFG.roadMatchMaxDist
+      ) ?? { pts: null, card: null, reason: null };
+      const card = computeTurnCard(turnData, kmh);
+
       // Update map overlays
       updateBadges(segments, kmh);
       if (overlayMain) {
@@ -905,12 +911,6 @@
         updateSegmentOverlay(segments, kmh);
       }
       updateDebugTriplets(segments, maxTurnRadius);
-
-      // Turn summary card
-      const { pts: mainRoadPts, card: turnData, reason: turnReason } = firstTurnAhead(
-        features, S.lon, S.lat, S.heading, CFG.lookahead, maxTurnRadius, CFG.aThreshold, CFG.roadMatchMaxDist
-      ) ?? { pts: null, card: null, reason: null };
-      const card = computeTurnCard(turnData, kmh);
       const turnCardEl = document.getElementById('turn-card');
       if (card !== null) {
         turnCardEl.style.display = 'block';
