@@ -14,6 +14,10 @@ import {
 } from '../lib/road.js';
 import { haversine } from '../lib/geo.js';
 
+// Convenience wrapper: matches the old firstTurnAhead(features,...) call pattern
+const fta = (features, lon, lat, heading, lookahead, maxR, a, matchMaxDist = 50) =>
+  firstTurnAhead(segmentsAhead(features, lon, lat, heading, lookahead, maxR, 0, matchMaxDist), heading, lookahead, maxR, a);
+
 // ── parseSpeed ───────────────────────────────────────────────────────────────
 
 test('parseSpeed: "50" → 50', () => {
@@ -363,36 +367,36 @@ const straightFeature = {
 };
 
 test('firstTurnAhead: no features → null', () => {
-  assert.strictEqual(firstTurnAhead([], 2.0, 48.0, 90, 500, MAX_R, A).card, null);
+  assert.strictEqual(fta([], 2.0, 48.0, 90, 500, MAX_R, A).card, null);
 });
 
 test('firstTurnAhead: no features → reason no match', () => {
-  assert.strictEqual(firstTurnAhead([], 2.0, 48.0, 90, 500, MAX_R, A).reason, 'no match');
+  assert.strictEqual(fta([], 2.0, 48.0, 90, 500, MAX_R, A).reason, 'no match');
 });
 
 test('firstTurnAhead: straight road → null', () => {
-  assert.strictEqual(firstTurnAhead([straightFeature], 2.0, 48.0, 90, 500, MAX_R, A, 50).card, null);
+  assert.strictEqual(fta([straightFeature], 2.0, 48.0, 90, 500, MAX_R, A, 50).card, null);
 });
 
 test('firstTurnAhead: straight road → reason straight', () => {
-  assert.strictEqual(firstTurnAhead([straightFeature], 2.0, 48.0, 90, 500, MAX_R, A, 50).reason, 'straight');
+  assert.strictEqual(fta([straightFeature], 2.0, 48.0, 90, 500, MAX_R, A, 50).reason, 'straight');
 });
 
 test('firstTurnAhead: 90° left turn (east→north) within lookahead → direction left', () => {
-  const { card } = firstTurnAhead([leftTurnFeature], 2.0, 48.0, 90, 500, MAX_R, A, 50);
+  const { card } = fta([leftTurnFeature], 2.0, 48.0, 90, 500, MAX_R, A, 50);
   assert.ok(card !== null, 'Expected turn to be detected');
   assert.strictEqual(card.direction, 'left');
 });
 
 test('firstTurnAhead: 90° right turn (east→south) within lookahead → direction right', () => {
-  const { card } = firstTurnAhead([rightTurnFeature], 2.0, 48.0, 90, 500, MAX_R, A, 50);
+  const { card } = fta([rightTurnFeature], 2.0, 48.0, 90, 500, MAX_R, A, 50);
   assert.ok(card !== null, 'Expected turn to be detected');
   assert.strictEqual(card.direction, 'right');
 });
 
 test('firstTurnAhead: turn beyond lookahead → null', () => {
   // Turn node is at cumdist ≈ 73 m — only find it with lookahead > 73 m
-  assert.strictEqual(firstTurnAhead([leftTurnFeature], 2.0, 48.0, 90, 50, MAX_R, A, 50).card, null);
+  assert.strictEqual(fta([leftTurnFeature], 2.0, 48.0, 90, 50, MAX_R, A, 50).card, null);
 });
 
 test('firstTurnAhead: track branching off a tertiary road does not suppress turn card', () => {
@@ -414,7 +418,7 @@ test('firstTurnAhead: track branching off a tertiary road does not suppress turn
     ]},
     properties: { class: 'track' },
   };
-  const { card } = firstTurnAhead([tertiaryRoad, trackBranch], 2.0, 48.0, 90, 500, MAX_R, A, 50);
+  const { card } = fta([tertiaryRoad, trackBranch], 2.0, 48.0, 90, 500, MAX_R, A, 50);
   assert.ok(card !== null, 'track branch should be discarded; turn card must show');
   assert.strictEqual(card.direction, 'left');
 });
@@ -443,7 +447,7 @@ test('firstTurnAhead: track with more pts in same bearing group does not evict m
     ]},
     properties: { class: 'track' },
   };
-  const { card } = firstTurnAhead([tertiary, track], 2.0, 48.001, 210, 500, MAX_R, A, 50);
+  const { card } = fta([tertiary, track], 2.0, 48.001, 210, 500, MAX_R, A, 50);
   // With old code (pts.length wins): track replaces tertiary → straight → null.
   // With new code (class wins): tertiary kept → right bend detected → non-null.
   assert.ok(card !== null, 'tertiary bend must be detected; track must not evict main road');
@@ -482,7 +486,7 @@ test('firstTurnAhead: short feature-boundary stub does not create spurious junct
     ]},
     properties: {},
   };
-  const { card } = firstTurnAhead([shortStub, longContinuation], 2.00025, 48.0003, 180, 500, MAX_R, A, 50);
+  const { card } = fta([shortStub, longContinuation], 2.00025, 48.0003, 180, 500, MAX_R, A, 50);
   assert.ok(card !== null, 'short stub should join the longer segment\'s group, not create a spurious junction');
 });
 
@@ -506,7 +510,7 @@ test('firstTurnAhead: backward BFS branch does not suppress turn card', () => {
     ]},
     properties: {},
   };
-  const { card } = firstTurnAhead([southToWestRoad, northBranch], 2.0, 48.002, 180, 500, MAX_R, A, 50);
+  const { card } = fta([southToWestRoad, northBranch], 2.0, 48.002, 180, 500, MAX_R, A, 50);
   assert.ok(card !== null, 'northward branch (>90° from heading) should be filtered; turn card must show');
   assert.strictEqual(card.direction, 'right');
 });
@@ -520,19 +524,19 @@ test('firstTurnAhead: junction (2 forward segments) → null', () => {
     ]},
     properties: {},
   };
-  const result = firstTurnAhead([leftTurnFeature, branchFeature], 2.0, 48.0, 90, 120, MAX_R, A, 50);
+  const result = fta([leftTurnFeature, branchFeature], 2.0, 48.0, 90, 120, MAX_R, A, 50);
   assert.strictEqual(result.card, null);
   assert.strictEqual(result.reason, 'junction');
 });
 
 test('firstTurnAhead: distanceToStart > 0 for non-immediate turn', () => {
-  const { card } = firstTurnAhead([leftTurnFeature], 2.0, 48.0, 90, 500, MAX_R, A, 50);
+  const { card } = fta([leftTurnFeature], 2.0, 48.0, 90, 500, MAX_R, A, 50);
   assert.ok(card !== null);
   assert.ok(card.distanceToStart > 0, `Expected distanceToStart > 0, got ${card.distanceToStart}`);
 });
 
 test('firstTurnAhead: minSpeed > 0', () => {
-  const { card } = firstTurnAhead([leftTurnFeature], 2.0, 48.0, 90, 500, MAX_R, A, 50);
+  const { card } = fta([leftTurnFeature], 2.0, 48.0, 90, 500, MAX_R, A, 50);
   assert.ok(card !== null);
   assert.ok(card.minSpeed !== null && card.minSpeed > 0);
 });
@@ -570,7 +574,7 @@ test('firstTurnAhead: service road spur in same bearing group does not evict pri
     ]},
     properties: { class: 'service' },
   };
-  const { card } = firstTurnAhead([primary, service], 2.0, 48.0, 20, 500, MAX_R, A, 50);
+  const { card } = fta([primary, service], 2.0, 48.0, 20, 500, MAX_R, A, 50);
   // Service road must not evict primary: result must reflect primary's geometry.
   // Primary's gentle arc gives a much higher minSpeed than a tight service-road curve.
   assert.ok(card !== null, 'turn card must be shown');
@@ -602,7 +606,7 @@ test('firstTurnAhead: minor road parallel to motorway does not suppress turn car
     ]},
     properties: { class: 'minor' },
   };
-  const { card } = firstTurnAhead([motorway, minorRoad], 2.0, 48.0, 90, 500, MAX_R, A, 50);
+  const { card } = fta([motorway, minorRoad], 2.0, 48.0, 90, 500, MAX_R, A, 50);
   assert.ok(card !== null, 'minor road must not create a spurious junction on a motorway');
 });
 
@@ -630,7 +634,7 @@ test('firstTurnAhead: oneway road is not walked backward in BFS (opposite carria
     ]},
     properties: { class: 'secondary', oneway: 1 },
   };
-  const { card } = firstTurnAhead([mainRoad, onewayWest], 2.0, 48.0, 90, 500, MAX_R, A, 50);
+  const { card } = fta([mainRoad, onewayWest], 2.0, 48.0, 90, 500, MAX_R, A, 50);
   assert.ok(card !== null, 'backward walk on a oneway road must not create a spurious junction');
 });
 
@@ -657,10 +661,10 @@ test('firstTurnAhead: null heading uses matched-road direction — opposite onew
     properties: { class: 'motorway', oneway: 1 },
   };
   // With heading=90°: should show turn card (works before and after fix)
-  const withHeading = firstTurnAhead([eastCarriageway, westCarriageway], 2.0, 48.0, 90, 500, MAX_R, A, 50);
+  const withHeading = fta([eastCarriageway, westCarriageway], 2.0, 48.0, 90, 500, MAX_R, A, 50);
   assert.ok(withHeading.card !== null, 'turn card must be shown with known heading');
   // With heading=null: must also show turn card using matched-road direction as reference
-  const nullHeading = firstTurnAhead([eastCarriageway, westCarriageway], 2.0, 48.0, null, 500, MAX_R, A, 50);
+  const nullHeading = fta([eastCarriageway, westCarriageway], 2.0, 48.0, null, 500, MAX_R, A, 50);
   assert.ok(nullHeading.card !== null, 'turn card must be shown even with null heading on a divided highway');
 });
 
@@ -692,7 +696,7 @@ test('firstTurnAhead: motorway ramp branches do not suppress turn card (roads_32
     ]},
     properties: { class: 'motorway', ramp: 1 },
   };
-  const { card, reason } = firstTurnAhead([mainMotorway, onRamp, loopRamp], 2.0, 48.0, 90, 500, MAX_R, A, 50);
+  const { card, reason } = fta([mainMotorway, onRamp, loopRamp], 2.0, 48.0, 90, 500, MAX_R, A, 50);
   assert.ok(reason !== 'junction', `ramp branches must not suppress turn card; got reason=${reason}`);
 });
 
@@ -722,7 +726,7 @@ test('firstTurnAhead: matched ramp with curvy continuation shows turn card (road
     ]},
     properties: { class: 'motorway', oneway: 1 },
   };
-  const { card, reason } = firstTurnAhead(
+  const { card, reason } = fta(
     [matchedRamp, curvyRamp, parallelMotorway], 0.0005, 48, 90, 500, MAX_R, A, 50,
   );
   assert.ok(reason === null, `expected turn card from curvy ramp; got reason=${reason}`);

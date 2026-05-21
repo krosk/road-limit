@@ -893,7 +893,7 @@
 
       // Turn summary card (computed first — used by both overlay and card UI)
       const { pts: mainRoadPts, card: turnData, reason: turnReason } = firstTurnAhead(
-        features, S.lon, S.lat, S.heading, CFG.lookahead, maxTurnRadius, CFG.aThreshold, CFG.roadMatchMaxDist
+        segments, S.heading, CFG.lookahead, maxTurnRadius, CFG.aThreshold
       ) ?? { pts: null, card: null, reason: null };
       const card = computeTurnCard(turnData, kmh);
 
