@@ -664,6 +664,38 @@ test('firstTurnAhead: null heading uses matched-road direction — opposite onew
   assert.ok(nullHeading.card !== null, 'turn card must be shown even with null heading on a divided highway');
 });
 
+test('firstTurnAhead: motorway ramp branches do not suppress turn card (roads_32)', () => {
+  // Reproduces roads_32: car on a motorway with on-ramp/off-ramp geometry (ramp:1)
+  // creating two extra direction groups that all share class=motorway.
+  // Before fix, all three groups survived the minor filter → junction → no card.
+  // After fix, ramp groups are discarded when a non-ramp motorway group exists.
+  const mainMotorway = {
+    type: 'Feature',
+    geometry: { type: 'LineString', coordinates: [
+      [2.0, 48.0], [2.001, 48.0], [2.002, 48.001], [2.003, 48.002],
+    ]},
+    properties: { class: 'motorway', oneway: 1 },
+  };
+  // On-ramp peeling off to the right (different net bearing) — ramp:1
+  const onRamp = {
+    type: 'Feature',
+    geometry: { type: 'LineString', coordinates: [
+      [2.001, 48.0], [2.002, 48.0], [2.003, 48.0],
+    ]},
+    properties: { class: 'motorway', ramp: 1, oneway: 1 },
+  };
+  // Loop ramp starting in travel direction but curving back — ramp:1
+  const loopRamp = {
+    type: 'Feature',
+    geometry: { type: 'LineString', coordinates: [
+      [2.001, 48.0], [2.002, 48.0005], [2.0015, 48.001], [2.001, 48.0015],
+    ]},
+    properties: { class: 'motorway', ramp: 1 },
+  };
+  const { card, reason } = firstTurnAhead([mainMotorway, onRamp, loopRamp], 2.0, 48.0, 90, 500, MAX_R, A, 50);
+  assert.ok(reason !== 'junction', `ramp branches must not suppress turn card; got reason=${reason}`);
+});
+
 // ── normaliseFeatures ─────────────────────────────────────────────────────────
 
 const coords = [[2, 48], [2.001, 48]];
