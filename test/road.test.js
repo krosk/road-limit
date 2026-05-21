@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import {
   parseSpeed,
   distToSegment,
@@ -731,6 +732,28 @@ test('firstTurnAhead: matched ramp with curvy continuation shows turn card (road
   );
   assert.ok(reason === null, `expected turn card from curvy ramp; got reason=${reason}`);
   assert.ok(card !== null, 'expected non-null turn card');
+});
+
+test('firstTurnAhead: non-ramp motorway in same direction group must not evict matched ramp (roads_37)', () => {
+  // Reproduces roads_37: car is on a ramp (oneway+ramp, _distToCar=5) approaching a left turn
+  // at r≈20m. A non-ramp motorway feature shares the same approximate net bearing as the
+  // matched ramp and joins its direction group during grouping.
+  // Before fix: the rampBetter rule evicted the matched ramp as group representative,
+  // replacing it with the 3-pt straight motorway. The ramp filter then considered the car
+  // NOT on a ramp (because the group representative was non-ramp), removed the curvy
+  // continuation ramp, and returned reason='straight'.
+  // After fix: the matched segment is never evicted from its group representative position.
+  const fixture = JSON.parse(readFileSync(new URL('../e2e/fixtures/roads_37.json', import.meta.url)));
+  const { lon, lat, heading } = fixture.meta.position;
+  const { lookahead, aThreshold } = fixture.meta.cfg;
+  const segments = segmentsAhead(fixture.features, lon, lat, heading, lookahead, 200, 0, 30);
+  const result = firstTurnAhead(segments, heading, lookahead, 200, aThreshold);
+  assert.ok(result !== null, 'expected firstTurnAhead to return a result');
+  const { card, reason } = result;
+  assert.ok(reason === null, `expected turn card to be shown; got reason=${reason}`);
+  assert.ok(card !== null, 'expected non-null turn card');
+  assert.equal(card.minSpeed, 35, `expected minSpeed=35, got ${card.minSpeed}`);
+  assert.equal(card.direction, 'left');
 });
 
 // ── normaliseFeatures ─────────────────────────────────────────────────────────
