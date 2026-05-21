@@ -475,7 +475,7 @@
     import { matchRoad, segmentsAhead, normaliseFeatures, firstTurnAhead } from './lib/road.js';
     import { DEFAULT_CFG } from './lib/config.js';
     import { createState, applyGPS, smoothCompass, applyMotion } from './lib/state.js';
-    import { computeTurnCard, segmentsGeoJSON, statusText, barState, badgeItems, debugTripletFeatures, turnPathSVG } from './lib/display.js';
+    import { computeTurnCard, overlayGeoJSON, segmentsGeoJSON, statusText, barState, badgeItems, debugTripletFeatures, turnPathSVG } from './lib/display.js';
 
     // Show deployed timestamp + commit SHA
     let _commitSha = '';
@@ -899,16 +899,8 @@
 
       // Update map overlays
       updateBadges(segments, kmh);
-      if (overlayMain) {
-        if (map && map.getSource('segments-ahead')) {
-          const color = !card ? '#888' : card.isOver ? '#e33' : card.minSpeed - kmh < 10 ? '#f90' : '#3a9';
-          map.getSource('segments-ahead').setData({
-            type: 'FeatureCollection',
-            features: mainRoadPts ? [{ type: 'Feature', geometry: { type: 'LineString', coordinates: mainRoadPts }, properties: { color } }] : [],
-          });
-        }
-      } else {
-        updateSegmentOverlay(segments, kmh);
+      if (map && map.getSource('segments-ahead')) {
+        map.getSource('segments-ahead').setData(overlayGeoJSON(segments, mainRoadPts, overlayMain, card, kmh, CFG.aThreshold));
       }
       updateDebugTriplets(segments, maxTurnRadius);
       const turnCardEl = document.getElementById('turn-card');
