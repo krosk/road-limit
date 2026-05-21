@@ -13,7 +13,7 @@ import {
   normaliseFeatures,
   firstTurnAhead,
 } from '../lib/road.js';
-import { haversine } from '../lib/geo.js';
+import { haversine, bearingTo } from '../lib/geo.js';
 
 // Convenience wrapper: matches the old firstTurnAhead(features,...) call pattern
 const fta = (features, lon, lat, heading, lookahead, maxR, a, matchMaxDist = 50) =>
@@ -754,6 +754,30 @@ test('firstTurnAhead: non-ramp motorway in same direction group must not evict m
   assert.ok(card !== null, 'expected non-null turn card');
   assert.equal(card.minSpeed, 35, `expected minSpeed=35, got ${card.minSpeed}`);
   assert.equal(card.direction, 'left');
+});
+
+test('firstTurnAhead: short matched ramp (<30m) must still anchor the direction group (roads_39)', () => {
+  // Reproduces roads_39: car is near the end of a ramp (only 2 pts = ~25m remaining).
+  // Because 25m < SEGMENT_MIN_LENGTH (30m), the matched segment could not create a direction
+  // group, so hasMatched was never set. The ramp filter then saw no matched ramp, treated the
+  // car as not-on-a-ramp, removed all ramp groups, and the perpendicular non-ramp motorway
+  // (bearing ~36°, roughly perpendicular to heading 338°) won.
+  // Fix: the matched segment always creates a direction group regardless of length.
+  const fixture = JSON.parse(readFileSync(new URL('../e2e/fixtures/roads_39.json', import.meta.url)));
+  const { lon, lat, heading } = fixture.meta.position;
+  const { lookahead, aThreshold } = fixture.meta.cfg;
+  const maxTurnRadius = (150 / 3.6) ** 2 / aThreshold;
+  const segments = segmentsAhead(fixture.features, lon, lat, heading, lookahead, maxTurnRadius, 0, 30);
+  const result = firstTurnAhead(segments, heading, lookahead, maxTurnRadius, aThreshold);
+  assert.ok(result !== null);
+  const { pts, reason } = result;
+  // The selected road must be the ramp (~338°), not the perpendicular motorway (~36°).
+  // Verify by checking that mainRoadPts heads roughly NNW, not NNE.
+  assert.ok(pts && pts.length >= 2, 'expected at least 2 pts');
+  const selectedBearing = bearingTo(pts[0][1], pts[0][0], pts[pts.length - 1][1], pts[pts.length - 1][0]);
+  // The correct ramp heads ~320–340°; the wrong motorway would head ~30–40°.
+  const diffFromHeading = Math.min(Math.abs(selectedBearing - heading), 360 - Math.abs(selectedBearing - heading));
+  assert.ok(diffFromHeading < 30, `selected road bearing ${selectedBearing.toFixed(0)}° should be near heading ${heading.toFixed(0)}°, diff=${diffFromHeading.toFixed(0)}°`);
 });
 
 // ── normaliseFeatures ─────────────────────────────────────────────────────────
