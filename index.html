@@ -457,6 +457,7 @@
                style="width:72px;background:#1a1a1a;border:1px solid #333;border-radius:6px;color:#fff;font-size:12px;padding:4px 6px;outline:none;margin-left:12px;">
         <span style="font-size:11px;color:#888;">lookahead</span>
         <button id="dbg-toggle" style="background:transparent;color:#fff;border:1px solid #666;border-radius:12px;padding:4px 0;font-size:12px;font-weight:600;cursor:pointer;flex-shrink:0;width:44px;text-align:center;margin-left:auto;">DBG</button>
+        <button id="overlay-toggle" style="background:transparent;color:#fff;border:1px solid #666;border-radius:12px;padding:4px 0;font-size:12px;font-weight:600;cursor:pointer;flex-shrink:0;width:44px;text-align:center;">RD</button>
         <button id="copy-roads-btn" style="background:transparent;color:#fff;border:1px solid #666;border-radius:12px;padding:4px 0;font-size:12px;font-weight:600;cursor:pointer;flex-shrink:0;width:44px;text-align:center;">CPY</button>
         <input type="file" id="load-roads-input" accept=".json" style="display:none">
         <button id="load-roads-btn" style="background:transparent;color:#fff;border:1px solid #666;border-radius:12px;padding:4px 0;font-size:12px;font-weight:600;cursor:pointer;flex-shrink:0;width:44px;text-align:center;">LDR</button>
@@ -496,6 +497,7 @@
 
     // ── Debug state ───────────────────────────────────────────────────────────
     let debugMode = false;
+    let overlayMain = false;
 
     // ── Mock features hook (Playwright / testing) ──────────────────────────────
     let _mockFeatures = null;
@@ -891,18 +893,28 @@
 
       // Update map overlays
       updateBadges(segments, kmh);
-      updateSegmentOverlay(segments, kmh);
+      if (overlayMain) {
+        if (map && map.getSource('segments-ahead')) {
+          const color = !card ? '#888' : card.isOver ? '#e33' : card.minSpeed - kmh < 10 ? '#f90' : '#3a9';
+          map.getSource('segments-ahead').setData({
+            type: 'FeatureCollection',
+            features: mainRoadPts ? [{ type: 'Feature', geometry: { type: 'LineString', coordinates: mainRoadPts }, properties: { color } }] : [],
+          });
+        }
+      } else {
+        updateSegmentOverlay(segments, kmh);
+      }
       updateDebugTriplets(segments, maxTurnRadius);
 
       // Turn summary card
-      const { card: turnData, reason: turnReason } = firstTurnAhead(
+      const { pts: mainRoadPts, card: turnData, reason: turnReason } = firstTurnAhead(
         features, S.lon, S.lat, S.heading, CFG.lookahead, maxTurnRadius, CFG.aThreshold, CFG.roadMatchMaxDist
-      ) ?? { card: null, reason: null };
+      ) ?? { pts: null, card: null, reason: null };
       const card = computeTurnCard(turnData, kmh);
       const turnCardEl = document.getElementById('turn-card');
       if (card !== null) {
         turnCardEl.style.display = 'block';
-        document.getElementById('turn-card-arrow').innerHTML = turnPathSVG(turnData.pts);
+        document.getElementById('turn-card-arrow').innerHTML = turnPathSVG(mainRoadPts);
         const speedEl = document.getElementById('turn-card-speed');
         speedEl.textContent = String(card.minSpeed);
         speedEl.classList.toggle('over', card.isOver);
@@ -1026,6 +1038,15 @@
       btn.style.background = debugMode ? '#ff0' : 'transparent';
       btn.style.color = debugMode ? '#000' : '#fff';
       btn.style.borderColor = debugMode ? '#ff0' : '#666';
+      if (S.lat !== null) renderDashboard();
+    });
+
+    document.getElementById('overlay-toggle').addEventListener('click', () => {
+      overlayMain = !overlayMain;
+      const btn = document.getElementById('overlay-toggle');
+      btn.style.background = overlayMain ? '#4af' : 'transparent';
+      btn.style.color = overlayMain ? '#000' : '#fff';
+      btn.style.borderColor = overlayMain ? '#4af' : '#666';
       if (S.lat !== null) renderDashboard();
     });
 
