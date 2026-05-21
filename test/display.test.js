@@ -1,5 +1,6 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import {
   computeTurnCard,
   overlayBadgeItems,
@@ -12,6 +13,7 @@ import {
   debugTripletFeatures,
   turnPathSVG,
 } from '../lib/display.js';
+import { segmentsAhead, firstTurnAhead } from '../lib/road.js';
 
 const A = 0.30 * 9.81; // default aThreshold
 
@@ -436,4 +438,27 @@ describe('turnPathSVG', () => {
     assert.ok(svg.includes('height="100"'));
     assert.ok(svg.includes('viewBox="0 0 80 100"'));
   });
+});
+
+// ── overlayBadgeItems fixture (roads_35) ──────────────────────────────────────
+
+test('overlayBadgeItems: roads_35 fixture — RD off yields 11 badges, tightest is 35 km/h', () => {
+  // roads_35: car on a motorway ramp (oneway+ramp, _distToCar=5) approaching a left turn.
+  // Turn card: minSpeed=35, distanceToStart=69. With overlayAll=false the badges come
+  // exclusively from detectAllTurns(mainRoadPts), which finds 11 tight nodes on the
+  // merged 13-pt ramp path.
+  const fixture = JSON.parse(readFileSync(new URL('../e2e/fixtures/roads_35.json', import.meta.url)));
+  const { lon, lat, heading } = fixture.meta.position;
+  const { lookahead, aThreshold } = fixture.meta.cfg;
+  const maxTurnRadius = 200;
+  const matchMaxDist = 30;
+
+  const segments = segmentsAhead(fixture.features, lon, lat, heading, lookahead, maxTurnRadius, 0, matchMaxDist);
+  const { pts: mainRoadPts } = firstTurnAhead(segments, heading, lookahead, maxTurnRadius, aThreshold)
+    ?? { pts: null };
+
+  const items = overlayBadgeItems(segments, mainRoadPts, false, 0, aThreshold, maxTurnRadius);
+  assert.equal(items.length, 11, `expected 11 badges, got ${items.length}`);
+  const minLimit = Math.min(...items.map(i => i.limit));
+  assert.equal(minLimit, 35, `expected tightest badge at 35 km/h, got ${minLimit}`);
 });
