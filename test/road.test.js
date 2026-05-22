@@ -780,6 +780,22 @@ test('firstTurnAhead: short matched ramp (<30m) must still anchor the direction 
   assert.ok(diffFromHeading < 30, `selected road bearing ${selectedBearing.toFixed(0)}° should be near heading ${heading.toFixed(0)}°, diff=${diffFromHeading.toFixed(0)}°`);
 });
 
+test('firstTurnAhead: series merge must not absorb backwards ramp — junction suppressed (roads_43)', () => {
+  // Reproduces roads_43: car exits a ramp onto a motorway merge zone.
+  // Forward BFS finds the ramp continuation (bearing ~35°) grouped with the matched segment,
+  // and a bridge ramp (bearing ~320°, nearly opposite). The series merge used to see only the
+  // bridge ramp within 25 m of the matched endpoint and incorrectly merged it in, producing a
+  // false "left turn" (minSpeed=58). Fix: continuation must be within 45° of matched net bearing.
+  const fixture = JSON.parse(readFileSync(new URL('../e2e/fixtures/roads_43.json', import.meta.url)));
+  const { lon, lat, heading } = fixture.meta.position;
+  const { lookahead, aThreshold } = fixture.meta.cfg;
+  const maxTurnRadius = (150 / 3.6) ** 2 / aThreshold;
+  const segments = segmentsAhead(fixture.features, lon, lat, heading, lookahead, maxTurnRadius, 0, 30);
+  const result = firstTurnAhead(segments, heading, lookahead, maxTurnRadius, aThreshold);
+  assert.ok(result !== null);
+  assert.equal(result.reason, 'junction', `expected junction suppression, got reason=${result.reason}`);
+});
+
 // ── normaliseFeatures ─────────────────────────────────────────────────────────
 
 const coords = [[2, 48], [2.001, 48]];
