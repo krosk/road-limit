@@ -58,12 +58,21 @@
       flex-direction: column;
     }
 
-    /* Map: full screen */
+    /* Map: full screen (portrait) */
     #map {
       position: absolute;
       inset: 0;
       width: 100%;
       height: 100%;
+    }
+
+    /* Left panel: transparent full-screen wrapper in portrait so children
+       can stay absolutely positioned while the panel itself doesn't block map taps */
+    #left-panel {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 10;
     }
 
     /* Speed card: top-left, always visible, grows right when turn is active */
@@ -74,7 +83,7 @@
       background: rgba(17, 17, 17, 0.85);
       border-radius: 0 0 14px 0;
       padding: 8px 12px;
-      z-index: 10;
+      pointer-events: auto;
       display: flex;
       flex-direction: row;
       align-items: center;
@@ -112,7 +121,7 @@
       background: rgba(17, 17, 17, 0.88);
       border-radius: 18px 18px 0 0;
       padding: 14px 16px 20px;
-      z-index: 10;
+      pointer-events: auto;
     }
 
     /* G meters */
@@ -376,6 +385,53 @@
     }
 
     #start-btn:active { opacity: 0.8; }
+
+    /* ── Landscape split layout ─────────────────────────────────────────────
+       Triggers when viewport is wider than tall (split-screen horizontal mode).
+       Left column: controls sidebar. Right column: map only.              */
+    @media (min-aspect-ratio: 1/1) {
+      body { display: flex; flex-direction: row; }
+
+      /* Map becomes right flex column instead of a full-screen absolute layer */
+      #map {
+        position: relative;
+        flex: 1;
+        inset: unset;
+        width: auto;
+        height: auto;
+      }
+
+      /* Left panel becomes a real sidebar column */
+      #left-panel {
+        position: relative;
+        inset: unset;
+        pointer-events: auto;
+        width: 280px;
+        flex-shrink: 0;
+        display: flex;
+        flex-direction: column;
+        background: #111;
+        overflow-y: auto;
+        overflow-x: hidden;
+      }
+
+      /* Speed card: static block, full panel width, no map-overlay styling */
+      #speed-overlay {
+        position: static;
+        border-radius: 0;
+        border-bottom: 1px solid #2a2a2a;
+        width: 100%;
+        min-width: 0;
+      }
+
+      /* Bottom panel: static block, fills remaining column height */
+      #bottom-panel {
+        position: static;
+        border-radius: 0;
+        flex: 1;
+        overflow-y: auto;
+      }
+    }
   </style>
 </head>
 <body>
@@ -387,8 +443,11 @@
     <button id="start-btn">Start</button>
   </div>
 
-  <!-- Map (full screen) -->
+  <!-- Map (full screen / right column in landscape) -->
   <div id="map"></div>
+
+  <!-- Left column: speed card + controls (overlay in portrait, sidebar in landscape) -->
+  <div id="left-panel">
 
   <!-- Speed card (always visible) + turn column (shown when turn ahead) -->
   <div id="speed-overlay">
@@ -452,7 +511,9 @@
       <div id="map-bearing" style="font-size:10px;color:#666;margin-top:6px;text-align:right;">↑ 0°</div>
       <div id="status-msg">Waiting…</div>
       <div id="version-msg" style="font-size:10px;color:#fff;margin-top:2px;text-align:right;"></div>
-  </div>
+  </div><!-- /#bottom-panel -->
+
+  </div><!-- /#left-panel -->
 
   <script type="module">
     import { haversine, bearingTo, angleDiff, destPoint, ptAtDistance, bearingAtDistance } from './lib/geo.js';
@@ -588,6 +649,10 @@
         pitch: 60,
         attributionControl: false,
       });
+
+      // Keep MapLibre canvas in sync when the map container is resized
+      // (triggered when the viewport crosses the portrait/landscape breakpoint)
+      new ResizeObserver(() => map.resize()).observe(document.getElementById('map'));
 
       map.on('load', () => {
         // All line-type layers, regardless of source-layer name.
