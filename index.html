@@ -276,43 +276,34 @@
 
     #pos-apply:disabled { opacity: 0.3; cursor: default; }
 
-    /* Panel collapse toggle */
-    #panel-btn {
-      position: absolute;
-      right: 12px;
-      top: 12px;
-      z-index: 10;
-      background: rgba(17, 17, 17, 0.85);
+    /* Panel toggle + fullscreen: left-edge button column inside the speed card */
+    #card-btns {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      justify-content: center;
+      padding-right: 12px;
+      margin-right: 4px;
+      border-right: 1px solid rgba(255, 255, 255, 0.15);
+    }
+
+    #panel-btn, #fullscreen-btn {
+      background: transparent;
       border: none;
-      border-radius: 10px;
+      border-radius: 8px;
       color: #fff;
       font-size: 18px;
       line-height: 1;
       cursor: pointer;
-      width: 40px;
-      height: 40px;
+      width: 32px;
+      height: 32px;
       display: flex;
       align-items: center;
       justify-content: center;
     }
 
-    #fullscreen-btn {
-      position: absolute;
-      right: 12px;
-      top: 60px;
-      z-index: 10;
-      background: rgba(17, 17, 17, 0.85);
-      border: none;
-      border-radius: 10px;
-      color: #fff;
-      font-size: 20px;
-      line-height: 1;
-      cursor: pointer;
-      width: 40px;
-      height: 40px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
+    #panel-btn:hover, #fullscreen-btn:hover {
+      background: rgba(255, 255, 255, 0.1);
     }
 
     /* Debug: BFS start-node marker */
@@ -406,6 +397,10 @@
 
   <!-- Speed card (always visible) + turn column (shown when turn ahead) -->
   <div id="speed-overlay">
+    <div id="card-btns">
+      <button id="panel-btn" title="Toggle panel">▼</button>
+      <button id="fullscreen-btn" title="Toggle fullscreen">⛶</button>
+    </div>
     <div id="speed-col">
       <div class="label">Speed</div>
       <div><span id="speed-value">0</span><span id="speed-unit">km/h</span></div>
@@ -464,9 +459,6 @@
       <div id="status-msg">Waiting…</div>
       <div id="version-msg" style="font-size:10px;color:#fff;margin-top:2px;text-align:right;"></div>
   </div>
-
-  <button id="panel-btn" title="Toggle panel">▼</button>
-  <button id="fullscreen-btn" title="Toggle fullscreen">⛶</button>
 
   <script type="module">
     import { haversine, bearingTo, destPoint, ptAtDistance, bearingAtDistance } from './lib/geo.js';
