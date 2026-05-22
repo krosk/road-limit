@@ -920,7 +920,7 @@
       // Extend overlay back to the road node immediately behind the car so the
       // colored line starts at the car's feet rather than at the next node ahead.
       const snapPt = match?.snapPt ?? null;
-      const overlayPts = snapPt ? [snapPt, ...mainRoadPts] : mainRoadPts;
+      const overlayPts = (snapPt && mainRoadPts) ? [snapPt, ...mainRoadPts] : mainRoadPts;
 
       // Update map overlays
       updateBadges(overlayBadgeItems(segments, mainRoadPts, overlayAll, kmh, CFG.aThreshold, maxTurnRadius), segments, kmh);
