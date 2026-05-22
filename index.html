@@ -925,19 +925,11 @@
           ? match.coords.slice(Math.max(0, match.segIdx - 1))
           : [...match.coords.slice(0, match.segIdx + 2)].reverse())
         : null;
-      const overlayBasePts = mainRoadPts ?? currentRoadPts;
+      const overlayPts = mainRoadPts ?? currentRoadPts;
 
-      // Prepend the road node behind the car (snapPt) to extend the overlay back to
-      // the car's feet. Only valid when the bearing from snapPt to overlayBasePts[0]
-      // is within 45° of the car's heading — avoids a false chord across the road
-      // network when snapPt and the overlay start are on disconnected features.
-      // currentRoadPts already starts at snapPt, so no prepend needed there.
-      const snapPt = match?.snapPt ?? null;
-      const snapBear = (snapPt && mainRoadPts)
-        ? bearingTo(snapPt[1], snapPt[0], mainRoadPts[0][1], mainRoadPts[0][0])
-        : null;
-      const snapAligned = S.heading != null && snapBear != null && angleDiff(S.heading, snapBear) < 45;
-      const overlayPts = (snapPt && mainRoadPts && snapAligned) ? [snapPt, ...mainRoadPts] : overlayBasePts;
+      // The 2-node segment the car is currently on: always rendered in blue,
+      // independent of which road firstTurnAhead selected for the path ahead.
+      const matchedSegPts = match ? [match.snapPt, match.coords[match.segIdx]] : null;
 
       // Update map overlays
       updateBadges(overlayBadgeItems(segments, mainRoadPts, overlayAll, kmh, CFG.aThreshold, maxTurnRadius), segments, kmh);
@@ -945,7 +937,7 @@
         map.getSource('segments-ahead').setData(overlayGeoJSON(segments, overlayPts, overlayAll, card, kmh, CFG.aThreshold));
       }
       if (map && map.getSource('junction-branches')) {
-        map.getSource('junction-branches').setData(junctionBranchGeoJSON(junctionGroups));
+        map.getSource('junction-branches').setData(junctionBranchGeoJSON(junctionGroups, matchedSegPts));
       }
       updateDebugTriplets(segments, maxTurnRadius);
       const turnCardEl = document.getElementById('turn-col');

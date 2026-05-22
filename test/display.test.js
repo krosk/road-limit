@@ -510,26 +510,36 @@ test('overlayBadgeItems: roads_35 fixture — RD off yields 11 badges, tightest 
 // ── junctionBranchGeoJSON ─────────────────────────────────────────────────────
 
 describe('junctionBranchGeoJSON', () => {
-  test('null input → empty FeatureCollection', () => {
+  test('null groups, no matchedSegPts → empty FeatureCollection', () => {
     const result = junctionBranchGeoJSON(null);
     assert.equal(result.type, 'FeatureCollection');
     assert.equal(result.features.length, 0);
   });
 
-  test('matched group gets blue + isMatched=1, alternate branch gets magenta + isMatched=0', () => {
+  test('matchedSegPts always rendered blue regardless of junctionGroups', () => {
+    const matchedSegPts = [[2, 48], [2.001, 48]];
+    const result = junctionBranchGeoJSON(null, matchedSegPts);
+    assert.equal(result.features.length, 1);
+    assert.equal(result.features[0].properties.color, '#48f');
+    assert.equal(result.features[0].properties.isMatched, 1);
+    assert.deepEqual(result.features[0].geometry.coordinates, matchedSegPts);
+  });
+
+  test('junction: matchedSegPts in blue, non-matched branch in magenta, matched group entry skipped', () => {
+    const matchedSegPts = [[2, 48], [2.0005, 48]];
     const jg = [
       { pts: [[2, 48], [2.001, 48]], isMatched: true },
       { pts: [[2, 48], [2, 48.001]], isMatched: false },
     ];
-    const result = junctionBranchGeoJSON(jg);
+    const result = junctionBranchGeoJSON(jg, matchedSegPts);
     assert.equal(result.features.length, 2);
     assert.equal(result.features[0].properties.color, '#48f');
-    assert.equal(result.features[0].properties.isMatched, 1);
+    assert.deepEqual(result.features[0].geometry.coordinates, matchedSegPts);
     assert.equal(result.features[1].properties.color, '#f48');
     assert.equal(result.features[1].properties.isMatched, 0);
   });
 
-  test('coordinates passed through unchanged', () => {
+  test('alternate branch coordinates passed through unchanged', () => {
     const pts1 = [[2, 48], [2.001, 48]];
     const jg = [{ pts: pts1, isMatched: false }];
     const result = junctionBranchGeoJSON(jg);
