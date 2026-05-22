@@ -1125,21 +1125,17 @@
 
     // ── Fullscreen toggle ─────────────────────────────────────────────────────
     const fsBtn = document.getElementById('fullscreen-btn');
-    if (document.fullscreenEnabled) {
-      const updateFsBtn = () => {
-        fsBtn.textContent = document.fullscreenElement ? '⊡' : '⛶';
-      };
-      fsBtn.addEventListener('click', () => {
-        if (!document.fullscreenElement) {
-          document.documentElement.requestFullscreen().catch(() => {});
-        } else {
-          document.exitFullscreen().catch(() => {});
-        }
-      });
-      document.addEventListener('fullscreenchange', updateFsBtn);
-    } else {
-      fsBtn.style.display = 'none';
-    }
+    const updateFsBtn = () => {
+      fsBtn.textContent = document.fullscreenElement ? '⊡' : '⛶';
+    };
+    fsBtn.addEventListener('click', () => {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(() => {});
+      } else {
+        document.exitFullscreen().catch(() => {});
+      }
+    });
+    document.addEventListener('fullscreenchange', updateFsBtn);
 
     // ── Debug toggle ───────────────────────────────────────────────────────────
     document.getElementById('dbg-toggle').addEventListener('click', () => {
