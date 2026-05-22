@@ -461,7 +461,7 @@
   </div>
 
   <script type="module">
-    import { haversine, bearingTo, destPoint, ptAtDistance, bearingAtDistance } from './lib/geo.js';
+    import { haversine, bearingTo, angleDiff, destPoint, ptAtDistance, bearingAtDistance } from './lib/geo.js';
     import { matchRoad, segmentsAhead, normaliseFeatures, firstTurnAhead } from './lib/road.js';
     import { DEFAULT_CFG } from './lib/config.js';
     import { createState, applyGPS, smoothCompass, applyMotion } from './lib/state.js';
@@ -917,10 +917,17 @@
       ) ?? { pts: null, card: null, reason: null, junctionGroups: null };
       const card = computeTurnCard(turnData, kmh);
 
-      // Extend overlay back to the road node immediately behind the car so the
-      // colored line starts at the car's feet rather than at the next node ahead.
+      // Prepend the road node behind the car (snapPt) to extend the overlay back to
+      // the car's feet. Only valid when the bearing from snapPt to mainRoadPts[0] is
+      // within 45° of the car's heading — if they are on disconnected features whose
+      // straight line cuts across the road network (e.g. a ramp → motorway jump) the
+      // prepend would draw a false chord across the interchange.
       const snapPt = match?.snapPt ?? null;
-      const overlayPts = (snapPt && mainRoadPts) ? [snapPt, ...mainRoadPts] : mainRoadPts;
+      const snapBear = (snapPt && mainRoadPts)
+        ? bearingTo(snapPt[1], snapPt[0], mainRoadPts[0][1], mainRoadPts[0][0])
+        : null;
+      const snapAligned = S.heading != null && snapBear != null && angleDiff(S.heading, snapBear) < 45;
+      const overlayPts = (snapPt && mainRoadPts && snapAligned) ? [snapPt, ...mainRoadPts] : mainRoadPts;
 
       // Update map overlays
       updateBadges(overlayBadgeItems(segments, mainRoadPts, overlayAll, kmh, CFG.aThreshold, maxTurnRadius), segments, kmh);
