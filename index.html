@@ -659,9 +659,22 @@
           data: { type: 'FeatureCollection', features: [] },
         });
         map.addLayer({
-          id: 'junction-branches-line',
+          id: 'junction-branches-matched',
           type: 'line',
           source: 'junction-branches',
+          filter: ['==', ['get', 'isMatched'], 1],
+          paint: {
+            'line-color': ['get', 'color'],
+            'line-width': 5,
+            'line-opacity': 0.85,
+          },
+          layout: { 'line-cap': 'round', 'line-join': 'round' },
+        });
+        map.addLayer({
+          id: 'junction-branches-others',
+          type: 'line',
+          source: 'junction-branches',
+          filter: ['==', ['get', 'isMatched'], 0],
           paint: {
             'line-color': ['get', 'color'],
             'line-width': 5,

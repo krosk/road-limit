@@ -516,7 +516,7 @@ describe('junctionBranchGeoJSON', () => {
     assert.equal(result.features.length, 0);
   });
 
-  test('matched group gets blue, alternate branch gets magenta', () => {
+  test('matched group gets blue + isMatched=1, alternate branch gets magenta + isMatched=0', () => {
     const jg = [
       { pts: [[2, 48], [2.001, 48]], isMatched: true },
       { pts: [[2, 48], [2, 48.001]], isMatched: false },
@@ -524,7 +524,9 @@ describe('junctionBranchGeoJSON', () => {
     const result = junctionBranchGeoJSON(jg);
     assert.equal(result.features.length, 2);
     assert.equal(result.features[0].properties.color, '#48f');
+    assert.equal(result.features[0].properties.isMatched, 1);
     assert.equal(result.features[1].properties.color, '#f48');
+    assert.equal(result.features[1].properties.isMatched, 0);
   });
 
   test('coordinates passed through unchanged', () => {
