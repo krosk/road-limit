@@ -849,6 +849,29 @@ test('matchRoad + firstTurnAhead: junction at feature boundary — currentRoadPt
   assert.ok(Math.abs(dA + dB - dAB) < 5, `car not between currentRoadPts[0..1]: dA=${Math.round(dA)} dB=${Math.round(dB)} dAB=${Math.round(dAB)}`);
 });
 
+test('matchRoad: contra-flow oneway — no match within matchMaxDist (roads_54)', () => {
+  // Reproduces roads_54: car heading 128° (SE) on a motorway interchange where the
+  // nearest feature (6 m) is a oneway ramp with coordinate-order bearing 318° (NW).
+  // Before the fix, matchRoad matched it and forced forward=true, causing BFS to start
+  // from the NW endpoint and pick up ~8 spurious south-going junction segments.
+  // After the fix, contra-flow oneway features are skipped in matchRoad; the next
+  // closest road is a track 48 m away — beyond matchMaxDist=30 — so segmentsAhead
+  // returns empty and firstTurnAhead reports 'no match'.
+  const fixture = JSON.parse(readFileSync(new URL('../e2e/fixtures/roads_54.json', import.meta.url)));
+  const { lon, lat, heading } = fixture.meta.position;
+  const { lookahead, aThreshold } = fixture.meta.cfg;
+  const maxTurnRadius = (150 / 3.6) ** 2 / aThreshold;
+
+  const match = matchRoad(fixture.features, lon, lat, heading);
+  assert.ok(!match || match.dist > 30, `expected no oneway match within 30 m, got dist=${match?.dist}`);
+
+  const segments = segmentsAhead(fixture.features, lon, lat, heading, lookahead, maxTurnRadius, 0, 30);
+  assert.equal(segments.length, 0, `expected no segments, got ${segments.length}`);
+
+  const result = firstTurnAhead(segments, heading, lookahead, maxTurnRadius, aThreshold);
+  assert.equal(result.reason, 'no match');
+});
+
 // ── normaliseFeatures ─────────────────────────────────────────────────────────
 
 const coords = [[2, 48], [2.001, 48]];
