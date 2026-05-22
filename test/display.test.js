@@ -12,6 +12,7 @@ import {
   badgeItems,
   debugTripletFeatures,
   turnPathSVG,
+  junctionBranchGeoJSON,
 } from '../lib/display.js';
 import { segmentsAhead, firstTurnAhead } from '../lib/road.js';
 
@@ -504,4 +505,32 @@ test('overlayBadgeItems: roads_35 fixture — RD off yields 11 badges, tightest 
   assert.equal(items.length, 11, `expected 11 badges, got ${items.length}`);
   const minLimit = Math.min(...items.map(i => i.limit));
   assert.equal(minLimit, 35, `expected tightest badge at 35 km/h, got ${minLimit}`);
+});
+
+// ── junctionBranchGeoJSON ─────────────────────────────────────────────────────
+
+describe('junctionBranchGeoJSON', () => {
+  test('null input → empty FeatureCollection', () => {
+    const result = junctionBranchGeoJSON(null);
+    assert.equal(result.type, 'FeatureCollection');
+    assert.equal(result.features.length, 0);
+  });
+
+  test('matched group gets blue, alternate branch gets magenta', () => {
+    const jg = [
+      { pts: [[2, 48], [2.001, 48]], isMatched: true },
+      { pts: [[2, 48], [2, 48.001]], isMatched: false },
+    ];
+    const result = junctionBranchGeoJSON(jg);
+    assert.equal(result.features.length, 2);
+    assert.equal(result.features[0].properties.color, '#48f');
+    assert.equal(result.features[1].properties.color, '#f48');
+  });
+
+  test('coordinates passed through unchanged', () => {
+    const pts1 = [[2, 48], [2.001, 48]];
+    const jg = [{ pts: pts1, isMatched: false }];
+    const result = junctionBranchGeoJSON(jg);
+    assert.deepEqual(result.features[0].geometry.coordinates, pts1);
+  });
 });

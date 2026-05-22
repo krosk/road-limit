@@ -465,7 +465,7 @@
     import { matchRoad, segmentsAhead, normaliseFeatures, firstTurnAhead } from './lib/road.js';
     import { DEFAULT_CFG } from './lib/config.js';
     import { createState, applyGPS, smoothCompass, applyMotion } from './lib/state.js';
-    import { computeTurnCard, overlayGeoJSON, overlayBadgeItems, segmentsGeoJSON, statusText, barState, badgeItems, debugTripletFeatures, turnPathSVG } from './lib/display.js';
+    import { computeTurnCard, overlayGeoJSON, overlayBadgeItems, segmentsGeoJSON, statusText, barState, badgeItems, debugTripletFeatures, turnPathSVG, junctionBranchGeoJSON } from './lib/display.js';
 
     // Show deployed timestamp + commit SHA
     let _commitSha = '';
@@ -650,6 +650,23 @@
             'line-color': ['get', 'color'],
             'line-width': 2,
             'line-opacity': 0.9,
+          },
+          layout: { 'line-cap': 'round', 'line-join': 'round' },
+        });
+
+        map.addSource('junction-branches', {
+          type: 'geojson',
+          data: { type: 'FeatureCollection', features: [] },
+        });
+        map.addLayer({
+          id: 'junction-branches-line',
+          type: 'line',
+          source: 'junction-branches',
+          paint: {
+            'line-color': ['get', 'color'],
+            'line-width': 5,
+            'line-opacity': 0.85,
+            'line-dasharray': [4, 3],
           },
           layout: { 'line-cap': 'round', 'line-join': 'round' },
         });
@@ -882,15 +899,20 @@
       );
 
       // Turn summary card (computed first — used by both overlay and card UI)
-      const { pts: mainRoadPts, card: turnData, reason: turnReason } = firstTurnAhead(
+      const { pts: mainRoadPts, card: turnData, reason: turnReason, junctionGroups } = firstTurnAhead(
         segments, S.heading, CFG.lookahead, maxTurnRadius, CFG.aThreshold
-      ) ?? { pts: null, card: null, reason: null };
+      ) ?? { pts: null, card: null, reason: null, junctionGroups: null };
       const card = computeTurnCard(turnData, kmh);
 
       // Update map overlays
       updateBadges(overlayBadgeItems(segments, mainRoadPts, overlayAll, kmh, CFG.aThreshold, maxTurnRadius), segments, kmh);
       if (map && map.getSource('segments-ahead')) {
         map.getSource('segments-ahead').setData(overlayGeoJSON(segments, mainRoadPts, overlayAll, card, kmh, CFG.aThreshold));
+      }
+      if (map && map.getSource('junction-branches')) {
+        map.getSource('junction-branches').setData(
+          (overlayAll || debugMode) ? junctionBranchGeoJSON(junctionGroups) : { type: 'FeatureCollection', features: [] }
+        );
       }
       updateDebugTriplets(segments, maxTurnRadius);
       const turnCardEl = document.getElementById('turn-col');
