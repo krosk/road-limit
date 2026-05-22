@@ -917,17 +917,27 @@
       ) ?? { pts: null, card: null, reason: null, junctionGroups: null };
       const card = computeTurnCard(turnData, kmh);
 
+      // For junction case, mainRoadPts is null. Fall back to the matched feature's
+      // remaining coordinates (snapPt → feature endpoint = junction node) so the
+      // current road is visible in the overlay even when the turn card is suppressed.
+      const currentRoadPts = (turnReason === 'junction' && match)
+        ? (match.forward
+          ? match.coords.slice(Math.max(0, match.segIdx - 1))
+          : [...match.coords.slice(0, match.segIdx + 2)].reverse())
+        : null;
+      const overlayBasePts = mainRoadPts ?? currentRoadPts;
+
       // Prepend the road node behind the car (snapPt) to extend the overlay back to
-      // the car's feet. Only valid when the bearing from snapPt to mainRoadPts[0] is
-      // within 45° of the car's heading — if they are on disconnected features whose
-      // straight line cuts across the road network (e.g. a ramp → motorway jump) the
-      // prepend would draw a false chord across the interchange.
+      // the car's feet. Only valid when the bearing from snapPt to overlayBasePts[0]
+      // is within 45° of the car's heading — avoids a false chord across the road
+      // network when snapPt and the overlay start are on disconnected features.
+      // currentRoadPts already starts at snapPt, so no prepend needed there.
       const snapPt = match?.snapPt ?? null;
       const snapBear = (snapPt && mainRoadPts)
         ? bearingTo(snapPt[1], snapPt[0], mainRoadPts[0][1], mainRoadPts[0][0])
         : null;
       const snapAligned = S.heading != null && snapBear != null && angleDiff(S.heading, snapBear) < 45;
-      const overlayPts = (snapPt && mainRoadPts && snapAligned) ? [snapPt, ...mainRoadPts] : mainRoadPts;
+      const overlayPts = (snapPt && mainRoadPts && snapAligned) ? [snapPt, ...mainRoadPts] : overlayBasePts;
 
       // Update map overlays
       updateBadges(overlayBadgeItems(segments, mainRoadPts, overlayAll, kmh, CFG.aThreshold, maxTurnRadius), segments, kmh);
