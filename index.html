@@ -920,7 +920,13 @@
       // Update map overlays
       updateBadges(overlayBadgeItems(segments, mainRoadPts, overlayAll, kmh, CFG.aThreshold, maxTurnRadius), segments, kmh);
       if (map && map.getSource('segments-ahead')) {
-        map.getSource('segments-ahead').setData(overlayGeoJSON(segments, mainRoadPts, overlayAll, card, kmh, CFG.aThreshold));
+        // Prepend car position so the overlay line starts at the car, not at the first
+        // BFS road node ahead (which can be 50–100 m away on highways with sparse nodes).
+        // mainRoadPts (original road nodes) is kept unchanged for badges and SVG.
+        const overlayPts = mainRoadPts && S.lat !== null
+          ? [[S.lon, S.lat], ...mainRoadPts]
+          : mainRoadPts;
+        map.getSource('segments-ahead').setData(overlayGeoJSON(segments, overlayPts, overlayAll, card, kmh, CFG.aThreshold));
       }
       if (map && map.getSource('junction-branches')) {
         map.getSource('junction-branches').setData(junctionBranchGeoJSON(junctionGroups));
