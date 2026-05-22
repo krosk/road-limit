@@ -49,13 +49,19 @@
       min-height: 16px;
     }
 
+    /* Turn card: in portrait a flex-row sibling of the speed card,
+       styled to look like a rightward extension of the same card */
     #turn-col {
-      display: none;
-      padding-left: 16px;
-      margin-left: 16px;
-      border-left: 1px solid rgba(255, 255, 255, 0.15);
-      justify-content: center;
+      display: none;                              /* JS sets flex when active */
       flex-direction: column;
+      justify-content: center;
+      background: rgba(17, 17, 17, 0.85);
+      border-radius: 0 0 14px 0;
+      padding: 8px 12px 8px 16px;
+      border-left: 1px solid rgba(255, 255, 255, 0.15);
+      pointer-events: auto;
+      align-self: flex-start;
+      flex-shrink: 0;
     }
 
     /* Map: full screen (portrait) */
@@ -66,20 +72,21 @@
       height: 100%;
     }
 
-    /* Left panel: transparent full-screen wrapper in portrait so children
-       can stay absolutely positioned while the panel itself doesn't block map taps */
+    /* Left panel: in portrait a transparent full-screen flex row so the speed
+       card and turn card sit side-by-side at top-left while the panel itself
+       doesn't block map taps */
     #left-panel {
       position: absolute;
       inset: 0;
       pointer-events: none;
       z-index: 10;
+      display: flex;
+      flex-direction: row;
+      align-items: flex-start;
     }
 
-    /* Speed card: top-left, always visible, grows right when turn is active */
+    /* Speed card: top-left flex item, grows right via #turn-col when turn is active */
     #speed-overlay {
-      position: absolute;
-      top: 0;
-      left: 0;
       background: rgba(17, 17, 17, 0.85);
       border-radius: 0 0 14px 0;
       padding: 8px 12px;
@@ -87,7 +94,7 @@
       display: flex;
       flex-direction: row;
       align-items: center;
-      min-width: 110px;
+      flex-shrink: 0;
     }
 
     #speed-overlay .label {
@@ -392,7 +399,7 @@
     @media (min-aspect-ratio: 1/1) {
       body { display: flex; flex-direction: row; }
 
-      /* Map becomes right flex column instead of a full-screen absolute layer */
+      /* Map: right flex column */
       #map {
         position: relative;
         flex: 1;
@@ -401,35 +408,43 @@
         height: auto;
       }
 
-      /* Left panel becomes a real sidebar column */
+      /* Left panel: sidebar column — panel left, map right */
       #left-panel {
         position: relative;
         inset: unset;
         pointer-events: auto;
         width: 280px;
         flex-shrink: 0;
-        display: flex;
-        flex-direction: column;
+        flex-direction: column;   /* override portrait row */
+        align-items: stretch;     /* override portrait flex-start */
         background: #111;
         overflow-y: auto;
         overflow-x: hidden;
       }
 
-      /* Speed card: static block, full panel width, no map-overlay styling */
+      /* Speed card: at top, full panel width */
       #speed-overlay {
-        position: static;
         border-radius: 0;
         border-bottom: 1px solid #2a2a2a;
         width: 100%;
-        min-width: 0;
       }
 
-      /* Bottom panel: static block, fills remaining column height */
+      /* Controls: fill remaining space between speed and turn */
       #bottom-panel {
         position: static;
         border-radius: 0;
         flex: 1;
         overflow-y: auto;
+      }
+
+      /* Turn card: pinned at bottom of panel */
+      #turn-col {
+        border-left: none;
+        border-top: 1px solid #2a2a2a;
+        border-radius: 0;
+        background: transparent;
+        padding: 12px;
+        align-self: auto;
       }
     }
   </style>
@@ -443,13 +458,12 @@
     <button id="start-btn">Start</button>
   </div>
 
-  <!-- Map (full screen / right column in landscape) -->
-  <div id="map"></div>
-
-  <!-- Left column: speed card + controls (overlay in portrait, sidebar in landscape) -->
+  <!-- Left column: speed card + controls + turn card
+       Portrait: transparent absolute overlay (speed top-left, turn adjacent, controls bottom sheet)
+       Landscape: 280px sidebar (speed top, controls middle, turn bottom) -->
   <div id="left-panel">
 
-  <!-- Speed card (always visible) + turn column (shown when turn ahead) -->
+  <!-- Speed card: always visible -->
   <div id="speed-overlay">
     <div id="card-btns">
       <button id="fullscreen-btn" title="Toggle fullscreen">⛶</button>
@@ -459,13 +473,9 @@
       <div class="label">Speed</div>
       <div><span id="speed-value">0</span><span id="speed-unit">km/h</span></div>
     </div>
-    <div id="turn-col">
-      <div><span id="turn-card-arrow"></span><span id="turn-card-speed">—</span><span id="turn-card-unit">km/h</span></div>
-      <div id="turn-card-info"></div>
-    </div>
   </div>
 
-  <!-- Bottom panel: G meters + turn warning + status -->
+  <!-- Bottom panel: G meters + controls + status (portrait: bottom sheet; landscape: middle) -->
   <div id="bottom-panel">
     <div class="g-row">
       <span class="g-label">Lateral</span>
@@ -513,7 +523,16 @@
       <div id="version-msg" style="font-size:10px;color:#fff;margin-top:2px;text-align:right;"></div>
   </div><!-- /#bottom-panel -->
 
+  <!-- Turn card: portrait — adjacent to speed card; landscape — bottom of sidebar -->
+  <div id="turn-col">
+    <div><span id="turn-card-arrow"></span><span id="turn-card-speed">—</span><span id="turn-card-unit">km/h</span></div>
+    <div id="turn-card-info"></div>
+  </div>
+
   </div><!-- /#left-panel -->
+
+  <!-- Map: full screen in portrait, right flex column in landscape -->
+  <div id="map"></div>
 
   <script type="module">
     import { haversine, bearingTo, angleDiff, destPoint, ptAtDistance, bearingAtDistance } from './lib/geo.js';

@@ -250,37 +250,48 @@ the bottom panel for live tuning without reloading.
 
 The layout is **responsive to viewport aspect ratio** via a CSS media query.
 
+The layout is **responsive to viewport aspect ratio** via a CSS media query.
+
+DOM order inside `#left-panel`: `#speed-overlay` → `#bottom-panel` → `#turn-col`.
+This ordering drives both layouts without CSS `order` properties.
+
 ### Portrait (viewport taller than wide — `max-aspect-ratio: 1/1`)
 
-`#left-panel` is a transparent `position: absolute; inset: 0` wrapper with
-`pointer-events: none`. Its children opt back in with `pointer-events: auto`.
+`#left-panel` is a transparent `position: absolute; inset: 0` flex row
+(`align-items: flex-start`, `pointer-events: none`). Children opt back in
+with `pointer-events: auto`. `#bottom-panel` is `position: absolute; bottom: 0`
+so it is taken out of the flex flow and sits at the bottom of the screen.
 
-- **Top-left overlay** (`#speed-overlay`): speed (km/h). Expands right to show
-  the turn column when a turn is active.
-- **Top-right of speed card** (`#turn-col`): turn summary card — SVG polyline
-  tracing actual road geometry, cornering speed (red when over limit), distance
-  and ETA. Hidden at junctions or when no turn within lookahead.
-- **Bottom sheet** (`#bottom-panel`): shown/hidden by `▼`/`▲`. Contains all
-  controls (G-force bars, threshold slider, GPS/SET, Dist/Lookahead, DBG, RD,
-  CPY, LDR, bearing, status line).
+- **Top-left** (`#speed-overlay`): speed (km/h) + `▼`/`⛶` buttons. Flex item,
+  `flex-shrink: 0`, sits at the start of the row.
+- **Top-right of speed card** (`#turn-col`): turn card — SVG road trace,
+  cornering speed, distance, ETA. Flex item adjacent to `#speed-overlay`;
+  styled with the same background and a `border-left` separator so it looks
+  like a rightward extension of the speed card. Hidden by default; JS sets
+  `display: flex` when a turn is active.
+- **Bottom sheet** (`#bottom-panel`): G-force bars, controls, status line.
+  Shown/hidden by `▼`/`▲`.
 - **Map**: full screen behind overlays.
 
 ### Landscape (viewport wider than tall — `min-aspect-ratio: 1/1`)
 
 Triggered by Android Chrome split-screen or any wide viewport. `body` becomes
-a flex row.
+a flex row: panel left, map right.
 
-- **Left sidebar** (`#left-panel`, 280 px, `overflow-y: auto`): static block
-  column containing `#speed-overlay` (top) and `#bottom-panel` (scrollable fill).
-  Always fully visible — no overlay, no transparency.
-- **Right column** (`#map`, `flex: 1`): map only. Car centering via `map.easeTo`
-  naturally targets the map container's own center, which is the right column.
+- **Left sidebar** (`#left-panel`, 280 px): switches to `flex-direction: column;
+  align-items: stretch`. Three stacked sections:
+  - **Top** — `#speed-overlay`: speed + buttons, `border-bottom` separator.
+  - **Middle** — `#bottom-panel` (`flex: 1`, scrollable): all controls.
+  - **Bottom** — `#turn-col`: turn card at full panel width, `border-top`
+    separator. Hidden when no turn ahead (same JS toggle as portrait).
+- **Right column** (`#map`, `flex: 1`): map only. `map.easeTo` centers the car
+  on the map container's own viewport (the right column) automatically.
 - A `ResizeObserver` on `#map` calls `map.resize()` whenever the container
-  changes size (e.g. when crossing the breakpoint or resizing the split).
+  changes size (breakpoint crossing or split resize).
 
 ### Controls (both layouts)
 
-- `▼`/`▲` in `#card-btns` toggles `#bottom-panel` visibility in both layouts.
+- `▼`/`▲` in `#card-btns` toggles `#bottom-panel` visibility.
 - `⛶`/`⊡` toggles fullscreen.
 - **Map overlays**: colored road segments ahead (green/orange/red); speed badges
   at curve nodes.
