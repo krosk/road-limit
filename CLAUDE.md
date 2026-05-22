@@ -44,14 +44,14 @@ lib/
   display.js            pure display computation (computeTurnCard,
                           segmentLineColor, segmentsGeoJSON, statusText,
                           barState, badgeItems, debugTripletFeatures,
-                          turnPathSVG)
+                          turnPathSVG, junctionBranchGeoJSON)
 test/
   geo.test.js           unit tests for lib/geo.js
   road.test.js          unit tests for lib/road.js
   motion.test.js        unit tests for lib/motion.js
   state.test.js         unit tests for lib/state.js
   display.test.js       unit tests for lib/display.js
-                        153 unit tests total across all lib files
+                        184 unit tests total across all lib files
 e2e/
   dashboard.spec.js     Playwright: mocks GPS + road features
   fixtures/             JSON road-feature fixtures for replay testing
@@ -200,6 +200,32 @@ WebGL canvas. Consequences:
   filter entirely; on a divided highway the opposite carriageway's forward
   (contra-flow) BFS walk passes unfiltered and creates a second `motorway`
   direction group, suppressing the turn card.
+- **Contra-flow oneway rejection in `matchRoad`**: if a candidate feature has
+  `oneway===1` and the car's heading is contra-flow (angleDiff > 90° from the
+  segment's forward bearing), `matchRoad` skips that feature entirely — no
+  match, no BFS. Without this, the nearest road on a one-way ramp would be
+  matched regardless of heading direction; `oneway===1` forced `forward=true`,
+  BFS started from the wrong endpoint, and downstream junctions produced
+  forward segments in the wrong direction that happened to pass the heading
+  filter (regression: roads_54).
+- **`matchedSegPts` as independent blue overlay**: `renderDashboard` computes
+  `matchedSegPts = [match.snapPt, match.coords[match.segIdx]]` — the two OSM
+  nodes bounding the car's position on the matched road — and passes it to
+  `junctionBranchGeoJSON` as a separate always-valid blue segment rendered via
+  the `junction-branches` MapLibre source. This is geometrically guaranteed to
+  be correct (two adjacent nodes on the matched feature). Do not prepend
+  `snapPt` to `mainRoadPts`: `firstTurnAhead` may select a different branch,
+  making `mainRoadPts` and `snapPt` belong to unrelated features, which draws
+  a false chord across the map (regression: roads_55).
+- **`JUNCTION_THRESH = 5 m` in `segmentsAhead`**: BFS only connects two
+  features as a junction when an endpoint of one lies within 5 m of an
+  endpoint of the other. This matches the actual OSM node-sharing topology
+  (nodes at tile-clipped boundaries can be a few metres apart). At 25 m,
+  parallel non-topological structures in dense interchanges (e.g. a bridge
+  ramp 21 m away, a parallel motorway carriageway 15 m away) were spuriously
+  connected, creating false second direction groups and suppressing turn cards.
+  5 m is tight enough to avoid spurious connections while still handling
+  tile-boundary splitting (regression: roads_43, roads_55).
 
 ## Configuration
 
@@ -231,7 +257,7 @@ the bottom panel for live tuning without reloading.
   - G-force bars (lateral / longitudinal)
   - Threshold slider (lateral G limit)
   - GPS/SET toggle + position inputs (Lon, Lat, Hdg°) + Apply
-  - Dist m (road match threshold) + lookahead distance + DBG toggle + CPY + LDR
+  - Dist m (road match threshold) + lookahead distance + DBG toggle + RD toggle + CPY + LDR
   - Map bearing + raw abs compass (`↑ X°  ·  Y°` where X = screen-top direction, Y = raw device compass)
   - Status line + deployed timestamp
 - **Floating buttons** (bottom-right corner, always visible):
