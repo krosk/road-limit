@@ -910,9 +910,7 @@
         map.getSource('segments-ahead').setData(overlayGeoJSON(segments, mainRoadPts, overlayAll, card, kmh, CFG.aThreshold));
       }
       if (map && map.getSource('junction-branches')) {
-        map.getSource('junction-branches').setData(
-          (overlayAll || debugMode) ? junctionBranchGeoJSON(junctionGroups) : { type: 'FeatureCollection', features: [] }
-        );
+        map.getSource('junction-branches').setData(junctionBranchGeoJSON(junctionGroups));
       }
       updateDebugTriplets(segments, maxTurnRadius);
       const turnCardEl = document.getElementById('turn-col');
