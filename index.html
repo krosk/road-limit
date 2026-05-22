@@ -912,13 +912,19 @@
       );
 
       // Turn summary card (computed first — used by both overlay and card UI)
-      const { pts: mainRoadPts, card: turnData, reason: turnReason, junctionGroups, snapPt } = firstTurnAhead(
+      const { pts: mainRoadPts, card: turnData, reason: turnReason, junctionGroups } = firstTurnAhead(
         segments, S.heading, CFG.lookahead, maxTurnRadius, CFG.aThreshold
-      ) ?? { pts: null, card: null, reason: null, junctionGroups: null, snapPt: null };
+      ) ?? { pts: null, card: null, reason: null, junctionGroups: null };
       const card = computeTurnCard(turnData, kmh);
 
-      // Extend overlay back to nearest road node before car (snapPt) so the
-      // colored line starts at the car's feet rather than at pts[0] ahead.
+      // Extend overlay back to the road node immediately behind the car so the
+      // colored line starts at the car's feet rather than at the next node ahead.
+      // Computed from match (already called above) to avoid threading it through segments.
+      const snapPt = match
+        ? (match.forward
+          ? (match.segIdx > 0 ? match.coords[match.segIdx - 1] : null)
+          : (match.segIdx < match.coords.length - 1 ? match.coords[match.segIdx + 1] : null))
+        : null;
       const overlayPts = snapPt ? [snapPt, ...mainRoadPts] : mainRoadPts;
 
       // Update map overlays
