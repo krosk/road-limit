@@ -912,20 +912,18 @@
       );
 
       // Turn summary card (computed first — used by both overlay and card UI)
-      const { pts: mainRoadPts, card: turnData, reason: turnReason, junctionGroups } = firstTurnAhead(
+      const { pts: mainRoadPts, card: turnData, reason: turnReason, junctionGroups, snapPt } = firstTurnAhead(
         segments, S.heading, CFG.lookahead, maxTurnRadius, CFG.aThreshold
-      ) ?? { pts: null, card: null, reason: null, junctionGroups: null };
+      ) ?? { pts: null, card: null, reason: null, junctionGroups: null, snapPt: null };
       const card = computeTurnCard(turnData, kmh);
+
+      // Extend overlay back to nearest road node before car (snapPt) so the
+      // colored line starts at the car's feet rather than at pts[0] ahead.
+      const overlayPts = snapPt ? [snapPt, ...mainRoadPts] : mainRoadPts;
 
       // Update map overlays
       updateBadges(overlayBadgeItems(segments, mainRoadPts, overlayAll, kmh, CFG.aThreshold, maxTurnRadius), segments, kmh);
       if (map && map.getSource('segments-ahead')) {
-        // Prepend car position so the overlay line starts at the car, not at the first
-        // BFS road node ahead (which can be 50–100 m away on highways with sparse nodes).
-        // mainRoadPts (original road nodes) is kept unchanged for badges and SVG.
-        const overlayPts = mainRoadPts && S.lat !== null
-          ? [[S.lon, S.lat], ...mainRoadPts]
-          : mainRoadPts;
         map.getSource('segments-ahead').setData(overlayGeoJSON(segments, overlayPts, overlayAll, card, kmh, CFG.aThreshold));
       }
       if (map && map.getSource('junction-branches')) {
