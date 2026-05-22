@@ -816,6 +816,39 @@ test('matchRoad: oneway feature is always walked forward — no contra-flow turn
   assert.ok(result.card === null, `expected no turn card for contra-flow position, got direction=${result.card?.direction}`);
 });
 
+test('matchRoad + firstTurnAhead: junction at feature boundary — currentRoadPts spans car (roads_52)', () => {
+  // Reproduces roads_52: car on a 2-node secondary road at the last node (feature
+  // boundary). BFS yields pts.length<2 for the matched feature, so no segment with
+  // isMatched=true is pushed. firstTurnAhead sees multiple direction groups from the
+  // continuation features and returns reason='junction'.
+  // renderDashboard falls back to match.coords.slice(segIdx-1) as currentRoadPts.
+  // This test verifies the two invariants that make the fallback correct:
+  //   1. reason is 'junction'
+  //   2. match.coords.slice(segIdx-1) produces a path that brackets the car
+  const fixture = JSON.parse(readFileSync(new URL('../e2e/fixtures/roads_52.json', import.meta.url)));
+  const { lon, lat, heading } = fixture.meta.position;
+  const { lookahead, aThreshold } = fixture.meta.cfg;
+  const maxTurnRadius = (150 / 3.6) ** 2 / aThreshold;
+
+  const match = matchRoad(fixture.features, lon, lat, heading);
+  assert.ok(match, 'should match a road');
+  assert.equal(match.forward, true);
+
+  const segments = segmentsAhead(fixture.features, lon, lat, heading, lookahead, maxTurnRadius, 0, 30);
+  const result = firstTurnAhead(segments, heading, lookahead, maxTurnRadius, aThreshold);
+  assert.equal(result.reason, 'junction', `expected junction, got ${result.reason}`);
+
+  // currentRoadPts = match.coords.slice(segIdx - 1) for forward travel
+  const currentRoadPts = match.coords.slice(Math.max(0, match.segIdx - 1));
+  assert.ok(currentRoadPts.length >= 2, 'currentRoadPts must have at least 2 points');
+
+  // Car must sit between currentRoadPts[0] and currentRoadPts[1]
+  const dA  = haversine(lat, lon, currentRoadPts[0][1], currentRoadPts[0][0]);
+  const dB  = haversine(lat, lon, currentRoadPts[1][1], currentRoadPts[1][0]);
+  const dAB = haversine(currentRoadPts[0][1], currentRoadPts[0][0], currentRoadPts[1][1], currentRoadPts[1][0]);
+  assert.ok(Math.abs(dA + dB - dAB) < 5, `car not between currentRoadPts[0..1]: dA=${Math.round(dA)} dB=${Math.round(dB)} dAB=${Math.round(dAB)}`);
+});
+
 // ── normaliseFeatures ─────────────────────────────────────────────────────────
 
 const coords = [[2, 48], [2.001, 48]];
