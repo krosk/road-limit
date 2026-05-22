@@ -919,12 +919,7 @@
 
       // Extend overlay back to the road node immediately behind the car so the
       // colored line starts at the car's feet rather than at the next node ahead.
-      // Computed from match (already called above) to avoid threading it through segments.
-      const snapPt = match
-        ? (match.forward
-          ? (match.segIdx > 0 ? match.coords[match.segIdx - 1] : null)
-          : (match.segIdx < match.coords.length - 1 ? match.coords[match.segIdx + 1] : null))
-        : null;
+      const snapPt = match?.snapPt ?? null;
       const overlayPts = snapPt ? [snapPt, ...mainRoadPts] : mainRoadPts;
 
       // Update map overlays
