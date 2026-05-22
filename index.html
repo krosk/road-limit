@@ -102,11 +102,6 @@
       margin-left: 2px;
     }
 
-    #road-name {
-      font-size: 12px;
-      color: #aaa;
-      margin-top: 4px;
-    }
 
     /* Bottom panel */
     #bottom-panel {
@@ -404,7 +399,6 @@
     <div id="speed-col">
       <div class="label">Speed</div>
       <div><span id="speed-value">0</span><span id="speed-unit">km/h</span></div>
-      <div id="road-name"></div>
     </div>
     <div id="turn-col">
       <div><span id="turn-card-arrow"></span><span id="turn-card-speed">—</span><span id="turn-card-unit">km/h</span></div>
@@ -892,17 +886,6 @@
       const match = S.lat !== null
         ? matchRoad(features, S.lon, S.lat, S.heading)
         : null;
-
-      const roadNameEl = document.getElementById('road-name');
-      if (match) {
-        const props = match.feature.properties || {};
-        const name = props.name || props.ref || '';
-        roadNameEl.textContent = name;
-        roadNameEl.style.display = name ? '' : 'none';
-      } else {
-        roadNameEl.textContent = '';
-        roadNameEl.style.display = 'none';
-      }
 
       // Segments ahead
       // maxRadius: curves with safe speed above 150 km/h at current threshold are ignored
