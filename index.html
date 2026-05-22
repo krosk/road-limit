@@ -36,12 +36,6 @@
       color: #e33;
     }
 
-    #turn-card-unit {
-      font-size: 16px;
-      color: #888;
-      margin-left: 2px;
-    }
-
     #turn-card-info {
       font-size: 12px;
       color: #aaa;
@@ -413,7 +407,7 @@
         position: relative;
         inset: unset;
         pointer-events: auto;
-        width: 280px;
+        width: 220px;
         flex-shrink: 0;
         flex-direction: column;   /* override portrait row */
         align-items: stretch;     /* override portrait flex-start */
@@ -525,7 +519,7 @@
 
   <!-- Turn card: portrait — adjacent to speed card; landscape — bottom of sidebar -->
   <div id="turn-col">
-    <div><span id="turn-card-arrow"></span><span id="turn-card-speed">—</span><span id="turn-card-unit">km/h</span></div>
+    <div><span id="turn-card-arrow"></span><span id="turn-card-speed">—</span></div>
     <div id="turn-card-info"></div>
   </div>
 
