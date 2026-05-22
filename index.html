@@ -54,7 +54,6 @@
       padding: 8px 12px 8px 16px;
       border-left: 1px solid rgba(255, 255, 255, 0.15);
       pointer-events: auto;
-      align-self: flex-start;
       flex-shrink: 0;
     }
 
@@ -76,7 +75,12 @@
       z-index: 10;
       display: flex;
       flex-direction: row;
-      align-items: flex-start;
+      align-items: stretch;
+    }
+
+    /* When turn card is visible, speed card is no longer the rightmost edge */
+    #left-panel.turn-active #speed-overlay {
+      border-radius: 0;
     }
 
     /* Speed card: top-left flex item, grows right via #turn-col when turn is active */
@@ -1002,8 +1006,10 @@
       }
       updateDebugTriplets(segments, maxTurnRadius);
       const turnCardEl = document.getElementById('turn-col');
+      const leftPanel = document.getElementById('left-panel');
       if (card !== null) {
         turnCardEl.style.display = 'flex';
+        leftPanel.classList.add('turn-active');
         document.getElementById('turn-card-arrow').innerHTML = turnPathSVG(mainRoadPts);
         const speedEl = document.getElementById('turn-card-speed');
         speedEl.textContent = String(card.minSpeed);
@@ -1012,6 +1018,7 @@
         document.getElementById('turn-card-info').textContent = `${card.distanceToStart} m${timeStr}`;
       } else {
         turnCardEl.style.display = 'none';
+        leftPanel.classList.remove('turn-active');
       }
 
       setStatus(statusText(features, segments, match, S.accuracy, turnReason));
