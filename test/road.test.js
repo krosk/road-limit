@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import {
   parseSpeed,
   distToSegment,
+  matchRoad,
   collectAhead,
   detectTurn,
   detectAllTurns,
@@ -794,6 +795,25 @@ test('firstTurnAhead: series merge must not absorb backwards ramp — junction s
   const result = firstTurnAhead(segments, heading, lookahead, maxTurnRadius, aThreshold);
   assert.ok(result !== null);
   assert.equal(result.reason, 'junction', `expected junction suppression, got reason=${result.reason}`);
+});
+
+test('matchRoad: oneway feature is always walked forward — no contra-flow turn card (roads_51)', () => {
+  // Reproduces roads_51: car heading 135° (SE) on a oneway=1 ramp whose coordinate
+  // order goes NNW (332°). matchRoad used to set forward=false because 135° is closer
+  // to the contra-flow bearing, causing segmentsAhead to walk the ramp backward and
+  // firstTurnAhead to emit a turn card for an illegal direction.
+  // Fix: oneway features always use forward=true; firstTurnAhead's heading filter
+  // then suppresses the segment because NNW is >90° from the car's SE heading.
+  const fixture = JSON.parse(readFileSync(new URL('../e2e/fixtures/roads_51.json', import.meta.url)));
+  const { lon, lat, heading } = fixture.meta.position;
+  const { lookahead, aThreshold } = fixture.meta.cfg;
+  const maxTurnRadius = (150 / 3.6) ** 2 / aThreshold;
+  const match = matchRoad(fixture.features, lon, lat, heading);
+  assert.equal(match.feature.properties.oneway, 1, 'matched feature should be oneway');
+  assert.equal(match.forward, true, 'oneway feature must always be walked forward');
+  const segments = segmentsAhead(fixture.features, lon, lat, heading, lookahead, maxTurnRadius, 0, 30);
+  const result = firstTurnAhead(segments, heading, lookahead, maxTurnRadius, aThreshold);
+  assert.ok(result.card === null, `expected no turn card for contra-flow position, got direction=${result.card?.direction}`);
 });
 
 // ── normaliseFeatures ─────────────────────────────────────────────────────────
