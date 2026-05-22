@@ -390,6 +390,20 @@ describe('turnPathSVG', () => {
     assert.ok(!svg.includes('<polyline'));
   });
 
+  test('pts[1] is directly above pts[0] regardless of initial bearing', () => {
+    // NE-going road: pts[0]→pts[1] is diagonal — rotation must align it straight up.
+    // Before the fix, the wrong rotation formula produced (−x, tiny_y) instead of (0, L),
+    // so the second SVG point was far to the left of the first, not above it.
+    const neDiagonal = [[2, 48], [2.001, 48.001], [2.002, 48.001]];
+    const svg = turnPathSVG(neDiagonal);
+    const m = svg.match(/polyline[^>]*points="([^"]+)"/);
+    const coords = m[1].trim().split(' ').map(s => s.split(',').map(Number));
+    const [x0, y0] = coords[0];
+    const [x1, y1] = coords[1];
+    assert.ok(Math.abs(x1 - x0) < 1, `pts[1] x=${x1.toFixed(1)} should be directly above pts[0] x=${x0.toFixed(1)}`);
+    assert.ok(y1 < y0, `pts[1] y=${y1.toFixed(1)} should be above pts[0] y=${y0.toFixed(1)}`);
+  });
+
   test('pts[0] is placed at bottom-centre (w/2, h-pad)', () => {
     const w = 52, h = 52, pad = 5;
     const svg = turnPathSVG(straight, w, h);
