@@ -781,12 +781,13 @@ test('firstTurnAhead: short matched ramp (<30m) must still anchor the direction 
   assert.ok(diffFromHeading < 30, `selected road bearing ${selectedBearing.toFixed(0)}° should be near heading ${heading.toFixed(0)}°, diff=${diffFromHeading.toFixed(0)}°`);
 });
 
-test('firstTurnAhead: series merge must not absorb backwards ramp — junction suppressed (roads_43)', () => {
-  // Reproduces roads_43: car exits a ramp onto a motorway merge zone.
-  // Forward BFS finds the ramp continuation (bearing ~35°) grouped with the matched segment,
-  // and a bridge ramp (bearing ~320°, nearly opposite). The series merge used to see only the
-  // bridge ramp within 25 m of the matched endpoint and incorrectly merged it in, producing a
-  // false "left turn" (minSpeed=58). Fix: continuation must be within 45° of matched net bearing.
+test('firstTurnAhead: bridge ramp on parallel structure is not a junction — right turn card shown (roads_43)', () => {
+  // Reproduces roads_43: car exits a ramp onto a motorway merge zone, heading ~35° (NNE).
+  // A bridge ramp going ~320° (NNW) sits ~21 m away on a parallel structure — not topologically
+  // connected (no shared OSM node). With JUNCTION_THRESH=5 m it is never discovered by BFS,
+  // so only the forward continuation exists and a right turn card is produced.
+  // (At 25 m the parallel ramp was spuriously connected, creating a second direction group
+  // and incorrectly suppressing the card with reason='junction'.)
   const fixture = JSON.parse(readFileSync(new URL('../e2e/fixtures/roads_43.json', import.meta.url)));
   const { lon, lat, heading } = fixture.meta.position;
   const { lookahead, aThreshold } = fixture.meta.cfg;
@@ -794,7 +795,9 @@ test('firstTurnAhead: series merge must not absorb backwards ramp — junction s
   const segments = segmentsAhead(fixture.features, lon, lat, heading, lookahead, maxTurnRadius, 0, 30);
   const result = firstTurnAhead(segments, heading, lookahead, maxTurnRadius, aThreshold);
   assert.ok(result !== null);
-  assert.equal(result.reason, 'junction', `expected junction suppression, got reason=${result.reason}`);
+  assert.equal(result.reason, null, `expected turn card (no junction), got reason=${result.reason}`);
+  assert.equal(result.card?.direction, 'right', `expected right turn, got ${result.card?.direction}`);
+  assert.equal(result.card?.minSpeed, 58, `expected minSpeed=58, got ${result.card?.minSpeed}`);
 });
 
 test('matchRoad: oneway feature is always walked forward — no contra-flow turn card (roads_51)', () => {
