@@ -59,7 +59,7 @@ test('turn card hidden with no road features', async ({ page }) => {
   await page.goto('/');
   await page.locator('#start-btn').click();
   await page.waitForTimeout(1000);
-  await expect(page.locator('#turn-card')).not.toBeVisible();
+  await expect(page.locator('#turn-col')).not.toBeVisible();
 });
 
 test('turn card shown for single road with 90° turn', async ({ page }) => {
@@ -81,7 +81,7 @@ test('turn card shown for single road with 90° turn', async ({ page }) => {
   await mockGPS(page, { latitude: 48.853, longitude: 2.346, speed: 10, heading: 90, accuracy: 10 });
   await page.goto('/');
   await page.locator('#start-btn').click();
-  await expect(page.locator('#turn-card')).toBeVisible({ timeout: 3000 });
+  await expect(page.locator('#turn-col')).toBeVisible({ timeout: 3000 });
   await expect(page.locator('#turn-card-speed')).toHaveText(/\d+/);
   await expect(page.locator('#turn-card-arrow svg')).toBeVisible();
 });
@@ -120,7 +120,7 @@ test('turn card hidden at junction — branch road within lookahead suppresses c
   await page.goto('/');
   await page.locator('#start-btn').click();
   await page.waitForTimeout(1500);
-  await expect(page.locator('#turn-card')).not.toBeVisible();
+  await expect(page.locator('#turn-col')).not.toBeVisible();
 });
 
 // ── fixture-based tests ───────────────────────────────────────────────────────
@@ -134,7 +134,7 @@ test('fixture: straight-road — road matched, no turn card', async ({ page }) =
   await page.locator('#start-btn').click();
   // Straight road → no turn detected → turn card must not appear
   await page.waitForTimeout(1500);
-  await expect(page.locator('#turn-card')).not.toBeVisible();
+  await expect(page.locator('#turn-col')).not.toBeVisible();
   // Road is matched → status shows road count, not "no road"
   await expect(page.locator('#status-msg')).toContainText('roads', { timeout: 3000 });
 });
@@ -148,7 +148,7 @@ test('fixture: junction-synthetic — straight roads at junction, no turn card',
   await page.locator('#start-btn').click();
   await page.waitForTimeout(1500);
   // Straight roads → no tight turn → turn card stays hidden
-  await expect(page.locator('#turn-card')).not.toBeVisible();
+  await expect(page.locator('#turn-col')).not.toBeVisible();
   // Status shows at least 2 features
   await expect(page.locator('#status-msg')).toContainText('roads', { timeout: 3000 });
 });
