@@ -453,15 +453,19 @@ describe('turnPathSVG', () => {
     }
   });
 
-  test('contains an arrowhead polygon at the last point', () => {
+  test('contains an arrowhead polygon whose base coincides with the last polyline point', () => {
     const svg = turnPathSVG(rightTurn);
     assert.ok(svg.includes('<polygon'), 'arrowhead polygon must be present');
     const polyMatch  = svg.match(/polyline[^>]*points="([^"]+)"/);
     const arrowMatch = svg.match(/polygon[^>]*points="([^"]+)"/);
     assert.ok(polyMatch && arrowMatch);
-    const lastPolyPt  = polyMatch[1].trim().split(' ').at(-1);
-    const arrowTipPt  = arrowMatch[1].trim().split(' ')[0];
-    assert.equal(arrowTipPt, lastPolyPt, 'arrowhead tip must coincide with last polyline point');
+    const lastPolyPt = polyMatch[1].trim().split(' ').at(-1).split(',').map(Number);
+    // arrowPts order: tip, base-left, base-right — midpoint of base-left + base-right == last poly pt
+    const [, bl, br] = arrowMatch[1].trim().split(' ').map(s => s.split(',').map(Number));
+    const midX = (bl[0] + br[0]) / 2;
+    const midY = (bl[1] + br[1]) / 2;
+    assert.ok(Math.abs(midX - lastPolyPt[0]) < 0.1, `base midX ${midX.toFixed(1)} should equal ${lastPolyPt[0]}`);
+    assert.ok(Math.abs(midY - lastPolyPt[1]) < 0.1, `base midY ${midY.toFixed(1)} should equal ${lastPolyPt[1]}`);
   });
 });
 
