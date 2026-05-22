@@ -438,6 +438,31 @@ describe('turnPathSVG', () => {
     assert.ok(svg.includes('height="100"'));
     assert.ok(svg.includes('viewBox="0 0 80 100"'));
   });
+
+  test('curl-back path (hairpin) stays entirely within SVG bounds', () => {
+    // North → east → south path: last point is below the start, simulating a tight U-turn
+    const hairpin = [[2, 48], [2, 48.001], [2.001, 48.001], [2.001, 48], [2.001, 47.999]];
+    const w = 52, h = 52;
+    const svg = turnPathSVG(hairpin, w, h);
+    const polyMatch = svg.match(/polyline[^>]*points="([^"]+)"/);
+    assert.ok(polyMatch, 'polyline must be present');
+    const coords = polyMatch[1].trim().split(' ').map(s => s.split(',').map(Number));
+    for (const [x, y] of coords) {
+      assert.ok(x >= 0 && x <= w, `polyline x=${x.toFixed(1)} out of [0,${w}]`);
+      assert.ok(y >= 0 && y <= h, `polyline y=${y.toFixed(1)} out of [0,${h}]`);
+    }
+  });
+
+  test('contains an arrowhead polygon at the last point', () => {
+    const svg = turnPathSVG(rightTurn);
+    assert.ok(svg.includes('<polygon'), 'arrowhead polygon must be present');
+    const polyMatch  = svg.match(/polyline[^>]*points="([^"]+)"/);
+    const arrowMatch = svg.match(/polygon[^>]*points="([^"]+)"/);
+    assert.ok(polyMatch && arrowMatch);
+    const lastPolyPt  = polyMatch[1].trim().split(' ').at(-1);
+    const arrowTipPt  = arrowMatch[1].trim().split(' ')[0];
+    assert.equal(arrowTipPt, lastPolyPt, 'arrowhead tip must coincide with last polyline point');
+  });
 });
 
 // ── overlayBadgeItems fixture (roads_35) ──────────────────────────────────────
