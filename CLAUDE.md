@@ -42,10 +42,12 @@ test/
   motion.test.js        unit tests for lib/motion.js
   state.test.js         unit tests for lib/state.js
   display.test.js       unit tests for lib/display.js
-                        185 unit tests total across all lib files
 e2e/
   dashboard.spec.js     Playwright: mocks GPS + road features
   fixtures/             JSON road-feature fixtures for replay testing
+scripts/
+  analyse-fixture.js    CLI: analyse a roads.json fixture — segments, coords,
+                          lengths, dist from car, overlay colours
 docs/adr/               architecture decision records
 mindmap.html            interactive function map (open in browser)
 ```

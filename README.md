@@ -36,6 +36,12 @@ Tests must pass before every push. Pushing to `main` deploys automatically via G
 
 All logic lives in `lib/`. `index.html` contains only browser API wiring. See `CLAUDE.md` for the full module map, architecture constraints, and agent-facing contracts.
 
+To diagnose a captured fixture — segments, coordinates, lengths, distances from car, and overlay colours:
+
+```bash
+node scripts/analyse-fixture.js e2e/fixtures/roads_57.json
+```
+
 ---
 
 ## Key concepts
