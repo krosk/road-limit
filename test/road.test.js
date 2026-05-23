@@ -94,6 +94,25 @@ test('collectAhead backward: starts at index 2, gets reversed coords', () => {
   ]);
 });
 
+test('collectAhead: includes first node that exceeds budget, not just nodes within it', () => {
+  // Nodes are ~100 m apart. Budget is 150 m.
+  // coords[1] at 100 m — within budget, included.
+  // coords[2] at 200 m — exceeds budget, but must still be included as the budget-breaker.
+  // coords[3] at 300 m — must not be included (loop stops after the budget-breaker).
+  const deg = 1 / 111320;
+  const step = 100 * deg;
+  const coords = [
+    [2.0, 48.0],
+    [2.0, 48.0 + step],
+    [2.0, 48.0 + step * 2],
+    [2.0, 48.0 + step * 3],
+    [2.0, 48.0 + step * 4],
+  ];
+  const result = collectAhead(coords, 0, true, 150);
+  assert.equal(result.length, 3, `expected 3 pts (budget-breaker included), got ${result.length}`);
+  assert.deepStrictEqual(result[2], coords[2]);
+});
+
 // ── detectTurn ───────────────────────────────────────────────────────────────
 
 test('detectTurn: collinear points → null (circumradius = Infinity)', () => {
