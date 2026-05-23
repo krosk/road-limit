@@ -1,18 +1,11 @@
 # Road Limit — Agent Context
 
 Live driving dashboard for cross-checking insurer telematics penalties.
-Tracks speed, G-force, and upcoming turn constraints, and compares them
-against road speed limits from OpenStreetMap.
-
-## Deployment
-
-The app is a static site with no build step. Pushing to `main` on GitHub
-automatically publishes it via GitHub Pages.
+Tracks speed, G-force, and upcoming turn constraints against OSM road data.
 
 ## Git workflow
 
-Commit and push directly to `main` — no feature branches. All commits in
-the repository history follow this convention.
+Commit and push directly to `main` — no feature branches. Pushing to `main` deploys automatically via GitHub Pages.
 
 ## Commands
 
@@ -24,9 +17,7 @@ npm test                # both
 
 Tests must pass before every push. The unit tests run in well under 1s.
 
-Every fix that follows a payload analysis (a fixture uploaded by the user
-to diagnose a real-world bug) must be accompanied by a regression test in
-`test/road.test.js` that would have caught the bug before the fix.
+Every fix that follows a fixture-based bug report must include a regression test in `test/road.test.js` that would have caught the bug before the fix.
 
 ## Structure
 
@@ -36,7 +27,7 @@ lib/
   config.js             DEFAULT_CFG constants (imported by index.html)
   geo.js                pure geo math (haversine, bearing, circumradius,
                           ptAtDistance, bearingAtDistance, destPoint, …)
-  road.js               road matching, lookahead, turn detection,
+  road.js               road matching, BFS, turn detection,
                           normaliseFeatures, corneringSpeed, …
   motion.js             accelerometer calibration (Option C rotation matrix)
   state.js              pure state update functions (applyGPS, smoothCompass,
@@ -51,7 +42,7 @@ test/
   motion.test.js        unit tests for lib/motion.js
   state.test.js         unit tests for lib/state.js
   display.test.js       unit tests for lib/display.js
-                        184 unit tests total across all lib files
+                        185 unit tests total across all lib files
 e2e/
   dashboard.spec.js     Playwright: mocks GPS + road features
   fixtures/             JSON road-feature fixtures for replay testing
@@ -59,18 +50,9 @@ docs/adr/               architecture decision records
 mindmap.html            interactive function map (open in browser)
 ```
 
-## Module architecture
+## Module boundaries
 
-All logic lives in `lib/`. `index.html` contains only:
-- Browser API wiring (MapLibre, Geolocation, Device Sensors)
-- DOM reads/writes
-- Event handlers that call lib functions and apply results to the DOM
-
-This means every decision — what the corner badge shows, what colour a
-segment gets, what the status line says, how GPS updates state — is a pure
-function in a lib module, unit-testable without a browser.
-
-### lib boundaries
+All logic lives in `lib/`. `index.html` contains only browser API wiring, DOM reads/writes, and event handlers that call lib functions.
 
 | Module | Depends on | Responsibility |
 |--------|-----------|----------------|
@@ -99,7 +81,7 @@ function in a lib module, unit-testable without a browser.
 | `applyManualPos` | reads SET-mode inputs, mutates state |
 | `setPosInputs` | writes position to DOM inputs |
 | `setStatus` | writes status line to DOM (no-op while `statusPinnedUntil` is in the future) |
-| `pinStatus` | writes status line and blocks `setStatus` for N ms (prevents GPS render loop from overwriting transient messages) |
+| `pinStatus` | writes status line and blocks `setStatus` for N ms |
 | `setBar` | updates G-bar DOM using `barState` |
 
 ## External API dependencies
@@ -110,196 +92,55 @@ function in a lib module, unit-testable without a browser.
 | **OpenFreeMap CDN** | vector tile style (`liberty`) | `initMap` |
 | **Geolocation API** | GPS position | `initGPS` → `onPos` |
 | **Device Sensors API** | accelerometer (`devicemotion`), orientation (`deviceorientation`), absolute compass (`deviceorientationabsolute`) | `initMotion` |
-| **Fetch API** | `HEAD index.html` for deployed timestamp; GitHub API (`/repos/krosk/road-limit/commits/main`) for commit SHA | startup |
+| **Fetch API** | `HEAD index.html` for deployed timestamp; GitHub API for commit SHA | startup |
 
-### queryRenderedFeatures viewport constraint
+### queryRenderedFeatures constraints
 
-`queryRenderedFeatures` only returns features currently drawn in the
-WebGL canvas. Consequences:
-- Road data is viewport-bound: features outside the visible area are not
-  returned even if their tiles are loaded.
-- At zoom 16 / pitch 60° the viewport extends well past the 120 m
-  lookahead, so in practice the constraint is not hit.
-- Tiles load asynchronously after a position change; `getRoadFeatures`
-  returns `[]` until the `idle` event fires.
-- There is no server-side or headless equivalent; a browser with a
-  rendered MapLibre canvas is required to call `queryRenderedFeatures`.
+- Returns only features drawn in the current WebGL viewport. Road data is viewport-bound.
+- Returns `[]` while tiles are still loading. The `idle` event triggers a re-render once tiles settle.
+- No server-side or headless equivalent. Fixture capture requires a live browser session.
+- Overlays do not update during map drag (only on `idle`) to avoid flicker from sparse mid-pan results.
 
-## Key design decisions (see docs/adr/ for full rationale)
+## Constraints
 
-- **Road geometry**: MapLibre GL `queryRenderedFeatures` on loaded tiles —
-  no external API calls while driving, tiles cache locally.
-- **Tile source**: OpenFreeMap (free, no API key, OSM data).
-- **Accelerometer calibration**: Option C — continuous transform using
-  `deviceorientation` (β/γ) + GPS heading. No manual calibration step,
-  self-corrects if phone shifts.
-- **Turn summary card**: replaces the old corner badge. `firstTurnAhead` in
-  `lib/road.js` runs `segmentsAhead` with the standard lookahead, returns null
-  for junctions (multiple forward segments) or no turn within lookahead.
-  `computeTurnCard` in `lib/display.js` formats it for display. Card shows
-  a dynamically generated SVG polyline tracing the actual road geometry ahead
-  (`turnPathSVG` in `lib/display.js`), min cornering speed, distance and ETA
-  to arc start. Speed turns red when over limit. Junction suppression: if BFS
-  finds >1 genuinely distinct driveable direction, no card shown.
-- **segmentsAhead algorithm**: BFS over the connected road graph up to
-  `CFG.lookahead` metres ahead only (lookBehind = 0). Starts from the
-  matched road, explores both directions at every junction node, tracks
-  cumulative distance budget. After collecting each segment's pts,
-  discards any segment whose net bearing (pts[0]→pts[last]) is >90°
-  from heading — this removes the backward BFS branch (the road the driver
-  just came from) that BFS always generates by branching both ways at every
-  node, preventing it from appearing in the visual overlay.
-- **Turn detection (`detectAllTurns`)**: computes circumradius for every
-  consecutive triplet of points. Uses a `nodeMinR` pass to propagate each
-  triplet's radius to all three of its nodes, so a node flanked by two tight
-  triplets is flagged even if its own triplet has a large radius. The first
-  collected node (`pts[0]`) is always an endpoint and can never receive a badge.
-- **Map heading**: above `CFG.minSpeedForHeading` (5 km/h) the map rotates
-  to match GPS heading. Below that, `deviceorientationabsolute` alpha is
-  smoothed with a circular EMA (α = 0.1), corrected by +180° for the current
-  phone mount, and applied via `updateCarPosition` at 2 Hz — identical code
-  path to a GPS heading update, so `S.heading` and `S.lastHeading` are both
-  updated and the road overlay follows the compass.
-- **SET mode drag heading**: dragging the map in SET mode computes bearing
-  from consecutive center positions (2 m threshold) and sets `S.heading`
-  automatically.
-- **normaliseFeatures**: `queryRenderedFeatures` returns `MultiLineString`
-  for roads that cross tile boundaries, and also returns the same physical
-  road multiple times (once per tile layer). `normaliseFeatures` in
-  `lib/road.js` (1) expands MultiLineString into individual LineStrings,
-  (2) deduplicates by `${first_coord};${last_coord}` key, and (3) strips
-  MapLibre internal fields (`_vectorTileFeature` etc.) to keep fixtures
-  small (~60× size reduction). Pure function, unit-tested independently.
-- **Junction suppression in `firstTurnAhead`**: after BFS, forward segments
-  are grouped by net bearing (30° tolerance). Groups within 30° of each
-  other are the same physical road split across OSM features (tile edges,
-  layer duplicates). After grouping, direction groups whose `roadClass` is
-  in `MINOR_CLASSES` (`minor`, `service`, `track`, `path`, `footway`,
-  `cycleway`, `steps`, `bridleway`) are discarded when at least one group
-  is on a proper driveable road — residential side streets, service spurs,
-  field tracks and footpaths that happen to branch off a motorway or primary
-  road are not genuine turn options. Only `dirGroups.length !== 1` —
-  genuinely distinct driveable directions — suppresses the turn card.
-  Within a direction group, a minor-road segment can never evict a main-road
-  segment even if it has more pts — road class takes priority over pts count
-  when selecting the representative segment for turn computation.
-- **Oneway roads in BFS**: when `segmentsAhead` discovers connecting features
-  at junction nodes, features with `oneway===1` are only queued in the
-  forward (coordinate-order) direction. The backward walk is skipped because
-  it represents contra-flow travel. The heading filter would normally reject
-  a forward walk that goes backward relative to the car, but skipping the
-  backward queue entry is also necessary: on a divided highway the opposite
-  carriageway (oneway in the other direction) shares junction nodes with the
-  matched road; its wrong-way backward walk could otherwise pass the heading
-  filter and create a spurious second direction group.
-- **`refHeading` in `firstTurnAhead`**: the direction filter in the grouping
-  loop uses `refHeading` instead of the raw `heading`. When `heading` is null
-  (app just started, speed below `minSpeedForHeading`, compass unavailable),
-  `refHeading` falls back to the initial bearing of `forward[0]` — the matched
-  segment's own travel direction. Without this, `heading===null` skips the
-  filter entirely; on a divided highway the opposite carriageway's forward
-  (contra-flow) BFS walk passes unfiltered and creates a second `motorway`
-  direction group, suppressing the turn card.
-- **Contra-flow oneway rejection in `matchRoad`**: if a candidate feature has
-  `oneway===1` and the car's heading is contra-flow (angleDiff > 90° from the
-  segment's forward bearing), `matchRoad` skips that feature entirely — no
-  match, no BFS. Without this, the nearest road on a one-way ramp would be
-  matched regardless of heading direction; `oneway===1` forced `forward=true`,
-  BFS started from the wrong endpoint, and downstream junctions produced
-  forward segments in the wrong direction that happened to pass the heading
-  filter (regression: roads_54).
-- **`matchedSegPts` as independent blue overlay**: `renderDashboard` computes
-  `matchedSegPts = [match.snapPt, match.coords[match.segIdx]]` — the two OSM
-  nodes bounding the car's position on the matched road — and passes it to
-  `junctionBranchGeoJSON` as a separate always-valid blue segment rendered via
-  the `junction-branches` MapLibre source. This is geometrically guaranteed to
-  be correct (two adjacent nodes on the matched feature). Do not prepend
-  `snapPt` to `mainRoadPts`: `firstTurnAhead` may select a different branch,
-  making `mainRoadPts` and `snapPt` belong to unrelated features, which draws
-  a false chord across the map (regression: roads_55).
-- **`JUNCTION_THRESH = 5 m` in `segmentsAhead`**: BFS only connects two
-  features as a junction when an endpoint of one lies within 5 m of an
-  endpoint of the other. This matches the actual OSM node-sharing topology
-  (nodes at tile-clipped boundaries can be a few metres apart). At 25 m,
-  parallel non-topological structures in dense interchanges (e.g. a bridge
-  ramp 21 m away, a parallel motorway carriageway 15 m away) were spuriously
-  connected, creating false second direction groups and suppressing turn cards.
-  5 m is tight enough to avoid spurious connections while still handling
-  tile-boundary splitting (regression: roads_43, roads_55).
+- `matchRoad` skips any feature with `oneway===1` when the car's heading is contra-flow (angleDiff > 90° from feature bearing). Violation causes BFS to start at the wrong endpoint and produce downstream segments that pass the heading filter. Regression: roads_54.
+- Never prepend `snapPt` to `mainRoadPts`. `firstTurnAhead` may select a different branch; `mainRoadPts[0]` and `snapPt` would then belong to unrelated features and draw a false chord across the map. Regression: roads_55.
+- `JUNCTION_THRESH` in `segmentsAhead` is 5 m. Do not raise it. At 25 m, parallel non-topological structures (bridge ramps, divided carriageways) were spuriously connected, creating false direction groups. Regressions: roads_43, roads_55.
+- BFS queues `oneway===1` features in the forward (coordinate-order) direction only. The backward entry is skipped — it represents contra-flow travel and would otherwise create a spurious second direction group on divided highways.
+- `firstTurnAhead` uses `refHeading` for the direction filter, not raw `heading`. When `heading` is null, `refHeading` falls back to the initial bearing of the matched segment.
+- `firstTurnAhead` computes `minRadius` across all nodes within lookahead, not just the first contiguous arc. Later tighter arcs must be reflected in `minSpeed`.
+- `matchedSegPts = [match.snapPt, match.coords[match.segIdx]]` is the independent blue overlay for the matched segment. Pass it to `junctionBranchGeoJSON` separately. Never merge it into `mainRoadPts`.
+- `normaliseFeatures` expands `MultiLineString` to individual `LineString` features, deduplicates by `${first_coord};${last_coord}` key, and strips MapLibre internal fields. Apply to all `queryRenderedFeatures` output before any lib function sees it.
+- `lateralGLimit` and `aThreshold` are kept in sync at the same g value. Change both together.
+- The first node of each BFS segment (`pts[0]`) is an endpoint and never receives a turn badge. `detectAllTurns` and `firstTurnAhead` both skip index 0.
 
 ## Configuration
 
-All tunable constants are defined in `lib/config.js` as `DEFAULT_CFG` and
-spread into a mutable local `CFG` at the top of `index.html`:
+All tunable constants are defined in `lib/config.js` as `DEFAULT_CFG` and spread into a mutable local `CFG` at the top of `index.html`:
 
 | Key | Default | Meaning |
 |-----|---------|---------|
 | `lateralGLimit` | 0.50 g | harsh cornering threshold |
 | `longGLimit` | 0.40 g | harsh braking/acceleration threshold |
 | `aThreshold` | 0.50 × 9.81 m/s² | lateral acceleration for turn speed formula |
-| `lookahead` | 120 m | road scan distance ahead of the car |
+| `lookahead` | 500 m | road scan distance ahead of the car |
 | `roadMatchMaxDist` | 30 m | max distance from car to nearest road to start BFS |
 
-`lateralGLimit` and `aThreshold` are kept in sync (both at 0.50 g). Tune once
-the insurer's exact threshold is confirmed.
-
-Both `roadMatchMaxDist` and `lookahead` are also exposed as number inputs in
-the bottom panel for live tuning without reloading.
+`roadMatchMaxDist` and `lookahead` are also exposed as number inputs in the bottom panel for live tuning without reloading.
 
 ## UI layout
 
-The layout is **responsive to viewport aspect ratio** via a CSS media query.
+Two responsive layouts driven by `@media (max-aspect-ratio: 1/1)` (portrait) and `@media (min-aspect-ratio: 1/1)` (landscape).
 
-The layout is **responsive to viewport aspect ratio** via a CSS media query.
+**Portrait:** `#left-panel` is `position: absolute; inset: 0`. `#card-row` (flex row) contains `#speed-overlay` and `#turn-col` at top-left. `#bottom-panel` is `position: absolute; bottom: 0`.
 
-DOM order inside `#left-panel`: `#speed-overlay` → `#bottom-panel` → `#turn-col`.
-This ordering drives both layouts without CSS `order` properties.
+**Landscape:** `body` is a flex row. `#left-panel` is a 220 px flex column (speed top, controls middle, turn card bottom). `#map` takes the remaining width. A `ResizeObserver` on `#map` calls `map.resize()` on container changes.
 
-### Portrait (viewport taller than wide — `max-aspect-ratio: 1/1`)
-
-`#left-panel` is a transparent `position: absolute; inset: 0` flex row
-(`align-items: flex-start`, `pointer-events: none`). Children opt back in
-with `pointer-events: auto`. `#bottom-panel` is `position: absolute; bottom: 0`
-so it is taken out of the flex flow and sits at the bottom of the screen.
-
-- **Top-left** (`#speed-overlay`): speed (km/h) + `▼`/`⛶` buttons. Flex item,
-  `flex-shrink: 0`, sits at the start of the row.
-- **Top-right of speed card** (`#turn-col`): turn card — SVG road trace,
-  cornering speed, distance, ETA. Flex item adjacent to `#speed-overlay`;
-  styled with the same background and a `border-left` separator so it looks
-  like a rightward extension of the speed card. Hidden by default; JS sets
-  `display: flex` when a turn is active.
-- **Bottom sheet** (`#bottom-panel`): G-force bars, controls, status line.
-  Shown/hidden by `▼`/`▲`.
-- **Map**: full screen behind overlays.
-
-### Landscape (viewport wider than tall — `min-aspect-ratio: 1/1`)
-
-Triggered by Android Chrome split-screen or any wide viewport. `body` becomes
-a flex row: panel left, map right.
-
-- **Left sidebar** (`#left-panel`, 280 px): switches to `flex-direction: column;
-  align-items: stretch`. Three stacked sections:
-  - **Top** — `#speed-overlay`: speed + buttons, `border-bottom` separator.
-  - **Middle** — `#bottom-panel` (`flex: 1`, scrollable): all controls.
-  - **Bottom** — `#turn-col`: turn card at full panel width, `border-top`
-    separator. Hidden when no turn ahead (same JS toggle as portrait).
-- **Right column** (`#map`, `flex: 1`): map only. `map.easeTo` centers the car
-  on the map container's own viewport (the right column) automatically.
-- A `ResizeObserver` on `#map` calls `map.resize()` whenever the container
-  changes size (breakpoint crossing or split resize).
-
-### Controls (both layouts)
-
-- `▼`/`▲` in `#card-btns` toggles `#bottom-panel` visibility.
-- `⛶`/`⊡` toggles fullscreen.
-- **Map overlays**: colored road segments ahead (green/orange/red); speed badges
-  at curve nodes.
+**Turn card toggle:** `#turn-col` is `display: none` by default. JS sets `display: flex` when a card is active and adds `.turn-active` to `#left-panel` (removes bottom-right border-radius from `#speed-overlay`).
 
 ## Capturing real-world road fixtures
 
-The **CPY** button downloads a `roads.json` file containing both diagnostic
-metadata and the current road topology.
+The **CPY** button downloads a `roads.json` file containing diagnostic metadata and the current road topology.
 
 ### CPY download format
 
@@ -311,7 +152,7 @@ metadata and the current road topology.
     "position": { "lon": 2.348, "lat": 48.853, "heading": 90, "accuracy": 5 },
     "speed": 50,
     "map": { "zoom": 16, "pitch": 60, "bearing": 90 },
-    "cfg": { "lookahead": 120, "roadMatchMaxDist": 30, "aThreshold": 4.905 },
+    "cfg": { "lookahead": 500, "roadMatchMaxDist": 30, "aThreshold": 4.905 },
     "match": { "dist": 8, "road": "Rue de Rivoli", "class": "primary" },
     "segments": { "forward": 1, "behind": 0 },
     "forwardClasses": [6, 3],     // pts.length of each forward BFS segment (NOT road class)
@@ -323,125 +164,69 @@ metadata and the current road topology.
     "rawLayerSummary": { "road_primary": 5, "road_primary_casing": 5, "road_secondary": 120 }
                                   // per-layer minimum distance to car (metres)
   },
-  "features": [ /* GeoJSON LineString features as returned by normaliseFeatures,
-                   each annotated with _distToCar (metres, min distance to car) */ ]
+  "features": [ /* GeoJSON LineString features from normaliseFeatures,
+                   each annotated with _distToCar (metres) */ ]
 }
 ```
 
-`rawCount` and `rawMinDist` are the most useful diagnostic fields: `rawCount` tells
-you how many features the tile engine returned before deduplication, and `rawMinDist`
-tells you the distance to the nearest raw road coordinate — if this is large (>30 m)
-the car is genuinely off-road or tiles haven't loaded for that area.
+Key diagnostic fields: `rawCount` (features before deduplication), `rawMinDist` (distance to nearest raw coordinate — large value means off-road or tile gap).
 
-`loadFixture` in `dashboard.spec.js` and `mockFeatures` both accept either
-format: a bare array of features, or `{ meta, features }`.
+`loadFixture` in `dashboard.spec.js` accepts either a bare feature array or `{ meta, features }`. The `features` array also plugs directly into `segmentsAhead` for unit tests.
 
-Workflow for adding a fixture-based test for a real location:
-1. Open the app, switch to **SET** mode, drag the map to the target location.
+Workflow for adding a fixture-based regression test:
+1. Switch to **SET** mode, drag the map to the target location.
 2. Wait for the status line to show a road count (tiles loaded).
 3. Press **CPY** — browser downloads `roads.json`.
 4. Rename and move to `e2e/fixtures/<name>.json`.
-5. Write a test in `e2e/dashboard.spec.js` using `loadFixture('<name>')`.
-6. Provide the fixture JSON and expected behaviour to an agent to generate
-   the test, or write it directly using the existing fixture tests as a model.
+5. Write a test in `test/road.test.js` (unit) or `e2e/dashboard.spec.js` (e2e).
 
-The `features` array plugs directly into `segmentsAhead` for unit tests, or
-into `mockFeatures` for e2e tests.
-
-**CPY feedback:**
-- **✓** — downloaded successfully
-- **—** — no features loaded yet
+**CPY feedback:** ✓ downloaded / — no features loaded yet.
 
 ### LDR — load a fixture at runtime
 
-The **LDR** button next to CPY opens a file picker. Loading a `roads.json`
-file (CPY format) restores the map state for before/after comparison:
+The **LDR** button opens a file picker. Loading a `roads.json` file restores map state for before/after comparison:
 - Switches to SET mode and applies `meta.position` (lon, lat, heading)
 - Restores `meta.map` (zoom, pitch, bearing) via `map.jumpTo`
 - Restores `meta.cfg` (lookahead, roadMatchMaxDist) including UI inputs
-- Calls `renderDashboard()` immediately (tiles may not be loaded yet)
-- Road features are computed from the live map tiles once they load (`idle` event)
-- Shows `Position loaded @ <commit>` in the status line for 4 s
+- Road features come from live map tiles (`idle` event), not from the file
 
-Features from the file are **not** injected — `queryRenderedFeatures` always
-runs on the real rendered tiles. `window.__setMockFeatures` is reserved for
-Playwright e2e tests only.
+`window.__setMockFeatures` is reserved for Playwright only. LDR does not use it.
 
-**LDR feedback:**
-- **✓** — loaded successfully (status line shows commit)
-- **✗** — file parse error (status line shows error message for 5 s)
+**LDR feedback:** ✓ loaded / ✗ parse error (status line shows message for 5 s).
 
-The file input is always reset after load, so the same file can be reloaded
-repeatedly (useful for before/after comparison after a code change).
-
-## Test hooks (for Playwright and manual debugging)
+## Test hooks
 
 `index.html` exposes:
-- `window.__setMockFeatures(features)` / `window.__mockFeatures` — inject
-  fake GeoJSON LineString features for Playwright e2e tests. When set,
-  `getRoadFeatures()` returns these instead of calling `normaliseFeatures`,
-  but `queryRenderedFeatures` still runs to keep the raw diagnostic globals
-  up to date. **LDR does not use this mechanism** — it restores position only
-  and lets the real map tiles supply features.
-- `window.__lastFeatures` — last normalised feature array from
-  `queryRenderedFeatures`. Downloaded by the **CPY** button.
-- `window.__lastRawCount` / `window.__lastLayersQueried` / `window.__lastRawMinDist`
-  / `window.__lastRawLayerSummary` — raw diagnostic globals updated on every
-  `getRoadFeatures()` call. Copied into `__lastDiag` and the CPY payload.
-- `window.__lastDiag` — full diagnostic snapshot written at the end of every
-  `renderDashboard()` call. Shape matches the `meta` field in the CPY download.
-  Key fields for debugging why the turn card is/isn't shown:
+- `window.__setMockFeatures(features)` / `window.__mockFeatures` — inject GeoJSON features for Playwright. `getRoadFeatures()` returns these; `queryRenderedFeatures` still runs to update diagnostics.
+- `window.__lastFeatures` — last normalised feature array from `queryRenderedFeatures`.
+- `window.__lastRawCount` / `window.__lastLayersQueried` / `window.__lastRawMinDist` / `window.__lastRawLayerSummary` — raw diagnostic globals, updated on every `getRoadFeatures()` call.
+- `window.__lastDiag` — full diagnostic snapshot after every `renderDashboard()`. Key fields:
   - `turnReason` — `"no match"` / `"junction"` / `"straight"` / `null` (card shown)
-  - `segments.forward` — number of forward BFS segments found
-  - `forwardClasses` — `pts.length` of each forward segment (proxy for how much
-    road BFS collected per branch)
-  - `match.dist` — metres from car to nearest road; if > `roadMatchMaxDist`, no BFS
-  - `rawMinDist` — metres to nearest raw tile coordinate; large value means tile gap
+  - `segments.forward` — number of forward BFS segments
+  - `forwardClasses` — `pts.length` of each forward segment
+  - `match.dist` — metres to nearest road; if > `roadMatchMaxDist`, no BFS
+  - `rawMinDist` — metres to nearest raw tile coordinate
 
 ## Debug mode (DBG)
 
-The bottom panel has a **DBG** toggle. When active:
-- Each evaluated triplet (pts[i-1], pts[i], pts[i+1]) is drawn as a dashed
-  polyline: **yellow** = tight circumradius (badge generated), **gray** = loose.
-- Speed badges are shifted 40 m to the right of the road; a colored line
-  connects the original node to its badge (green = under limit, red = over).
-- A **cyan ▶ square** marks `pts[0]` of each forward BFS segment — the start
-  node that can never receive a badge.
+Toggle in the bottom panel. When active:
+- Each evaluated triplet is drawn as a dashed polyline: **yellow** = tight (badge generated), **gray** = loose.
+- Speed badges are shifted 40 m to the right; a colored line connects node to badge (green = under limit, red = over).
+- A **cyan ▶ square** marks `pts[0]` of each forward BFS segment.
 
-## Manual position mode
+## Manual position mode (SET)
 
-The bottom panel has a GPS/SET toggle. In **SET** mode:
-- The three inputs (Lon, Lat, Hdg°) become editable.
-- Dragging the map updates the position live and infers heading from drag
-  direction (bearing between consecutive center positions, 2 m threshold).
-- Pressing **Apply** jumps the car dot and redraws the overlay.
-- GPS updates are ignored until toggled back to **GPS**.
-
-In **GPS** mode the fields are read-only and show the live GPS position.
+Toggle in the bottom panel. In SET mode:
+- Lon, Lat, Hdg° inputs are editable.
+- Dragging the map updates position live and infers heading from drag direction (2 m threshold).
+- **Apply** jumps the car dot and redraws the overlay.
+- GPS updates are ignored until toggled back to GPS mode.
 
 ## Known limitations
 
-- OSM speed limits are sparse on minor roads; badges show cornering speed
-  estimate (from geometry) when `maxspeed` tag is absent.
-- GPS heading unreliable below ~5 km/h; `deviceorientationabsolute` takes
-  over (2 Hz, circular EMA, +180° mount correction). The 180° offset is
-  specific to the current phone mount — adjust if mount orientation changes.
-- `deviceorientationabsolute` not available on iOS; `webkitCompassHeading`
-  from `deviceorientation` would be the equivalent but is currently unused.
-- `queryRenderedFeatures` returns clipped geometries at tile boundaries;
-  roads crossing a tile edge arrive as MultiLineString — normalised to
-  individual LineStrings by `normaliseFeatures` in `lib/road.js`.
-  `queryRenderedFeatures` also returns the same road multiple times (once
-  per tile layer); `normaliseFeatures` deduplicates by first+last coordinate.
-- `queryRenderedFeatures` returns 0 features while tiles are still loading
-  (e.g. immediately after a drag in SET mode). The `idle` event triggers a
-  re-render once tiles settle.
-- `queryRenderedFeatures` is viewport-bound: no headless or server-side
-  equivalent exists. Fixture capture requires a browser session.
-- Overlays do not update during map drag (only on `idle`) to avoid flicker
-  from sparse `queryRenderedFeatures` results mid-pan.
-- The first collected node of each BFS segment (`pts[0]`) is excluded from
-  turn detection; no badge appears there even if the geometry is curved.
-  In DBG mode a cyan ▶ marker identifies this node.
+- OSM speed limits are sparse on minor roads; badges show cornering speed from geometry when `maxspeed` tag is absent.
+- GPS heading unreliable below ~5 km/h; `deviceorientationabsolute` takes over (2 Hz, circular EMA, +180° mount correction). The 180° offset is specific to the current phone mount.
+- `deviceorientationabsolute` not available on iOS; `webkitCompassHeading` from `deviceorientation` is the equivalent but currently unused.
+- `queryRenderedFeatures` returns clipped geometries at tile boundaries as `MultiLineString` — handled by `normaliseFeatures`.
 - Turn speed formula assumes flat road; no grade correction.
-- Insurer threshold (0.5g default) is a working assumption until confirmed.
+- Insurer threshold (0.5 g default) is a working assumption until confirmed.
