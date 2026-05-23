@@ -875,6 +875,46 @@ test('matchRoad: contra-flow oneway — no match within matchMaxDist (roads_54)'
   assert.equal(result.reason, 'no match');
 });
 
+test('firstTurnAhead: tighter arc beyond first arc is reflected in minSpeed', () => {
+  // Two separate arcs on the same road: a gentle first arc (large radius, high
+  // speed limit) followed by a tighter arc (smaller radius, lower speed limit).
+  // Before the fix, minRadius was computed only over the first contiguous arc, so
+  // the tighter downstream arc was silently ignored and minSpeed was too high.
+  // After the fix, all nodes within lookahead are scanned for the global minimum.
+  const A = 4.905;
+  const lookahead = 500;
+  // Build a road with a gentle wiggle at node 3 (~350 m radius) then a tighter
+  // bend at node 6 (~140 m radius).  Both radii are below maxTurnRadius (354 m).
+  // We use circumradius(p0,p1,p2) ≈ |p1-p0|·|p2-p1|·|p0-p2| / (4·area).
+  // Simple construction: step east 50 m per node, then add a northward offset
+  // to create the two separate curves.
+  const deg = 1 / 111320; // ~1 m in degrees lat
+  const baseLat = 48.0, baseLon = 2.0;
+  const step = 50 * deg; // 50 m steps east
+  const gentleOffset = 4 * deg;  // gentle bend
+  const tightOffset  = 16 * deg; // tight bend
+  const coords = [
+    [baseLon + 0 * step, baseLat],
+    [baseLon + 1 * step, baseLat],
+    [baseLon + 2 * step, baseLat + gentleOffset],  // gentle bend
+    [baseLon + 3 * step, baseLat],
+    [baseLon + 4 * step, baseLat],
+    [baseLon + 5 * step, baseLat + tightOffset],   // tight bend
+    [baseLon + 6 * step, baseLat],
+    [baseLon + 7 * step, baseLat],
+  ];
+  const feature = { type: 'Feature', geometry: { type: 'LineString', coordinates: coords }, properties: { class: 'primary' } };
+  const maxR = (150 / 3.6) ** 2 / A; // ~354 m — same as index.html
+  const { card } = fta([feature], baseLon, baseLat - 1 * deg, 90, lookahead, maxR, A, 100);
+  assert.ok(card !== null, 'expected a turn card');
+  // The tighter arc (tight bend) must dominate minSpeed
+  const tightSpeedApprox = corneringSpeed(card.minRadius, A);
+  assert.ok(card.minSpeed < corneringSpeed(maxR, A),
+    `minSpeed ${card.minSpeed.toFixed(1)} should be below the 150 km/h cap`);
+  // distanceToStart reflects the first arc, not the tighter downstream arc
+  assert.ok(card.distanceToStart < 200, `distanceToStart ${card.distanceToStart} should be for first arc`);
+});
+
 // ── normaliseFeatures ─────────────────────────────────────────────────────────
 
 const coords = [[2, 48], [2.001, 48]];
